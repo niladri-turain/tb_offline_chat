@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<title>TB Chat Offline — Design ও App Flow</title>
+<link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=Poppins:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  @page { size: A4; margin: 18mm 16mm 18mm 16mm; }
+  :root { --pink:#ec4899; --purple:#7c3aed; --lav:#ede9fe; --ink:#1f1b2e; --muted:#5b5670; --line:#e7e3f3; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: "Inter","Hind Siliguri","Bangla Sangam MN",sans-serif; color:var(--ink); font-size:11pt; line-height:1.65; background:#fff; }
+  .hero { background: linear-gradient(135deg,var(--pink),var(--purple)); color:#fff; border-radius:16px; padding:22px 24px; margin-bottom:18px; }
+  .hero h1 { font-family:"Poppins","Hind Siliguri",sans-serif; margin:0 0 4px; font-size:22pt; font-weight:700; }
+  .hero p { margin:0; opacity:.92; }
+  .hero a { color:#fff; }
+  h2 { font-family:"Poppins","Hind Siliguri",sans-serif; font-size:14pt; color:var(--purple); margin:22px 0 8px; padding-bottom:4px; border-bottom:2px solid var(--line); }
+  h3 { font-family:"Poppins","Hind Siliguri",sans-serif; font-size:11.5pt; margin:0 0 4px; }
+  code { font-family: ui-monospace, Menlo, monospace; font-size:9.5pt; background:var(--lav); color:#5b21b6; padding:1px 5px; border-radius:5px; }
+  .chips { display:flex; flex-wrap:wrap; gap:6px; margin:8px 0; }
+  .chip { background:var(--lav); color:#5b21b6; border-radius:999px; padding:3px 10px; font-size:9.5pt; font-weight:500; }
+  .grid { display:grid; grid-template-columns:1fr 1fr; gap:6px 14px; margin:8px 0; padding:0; list-style:none; }
+  .grid li { display:flex; gap:8px; align-items:center; border:1px solid var(--line); border-radius:10px; padding:6px 10px; }
+  .num { flex:none; width:22px; height:22px; border-radius:50%; background:linear-gradient(135deg,var(--pink),var(--purple)); color:#fff; font-size:9pt; font-weight:600; display:flex; align-items:center; justify-content:center; font-family:"Poppins",sans-serif; }
+  .warn { background:#fff7ed; border:1px solid #fed7aa; border-left:5px solid #f97316; border-radius:10px; padding:12px 16px; margin:14px 0; break-inside:avoid; }
+  .warn h3 { color:#c2410c; }
+  .warn .rec { margin-top:6px; font-weight:600; }
+  .step { border:1px solid var(--line); border-radius:12px; padding:12px 16px 8px; margin:10px 0; break-inside:avoid; }
+  .step h3 { display:flex; align-items:center; gap:8px; }
+  .tag { font-family:"Inter",sans-serif; font-size:8.5pt; font-weight:500; color:var(--muted); background:#f6f4fb; border-radius:6px; padding:1px 7px; }
+  ul { margin:4px 0 6px; padding-left:20px; }
+  ul ul { margin:2px 0; }
+  li { margin:2px 0; }
+  .muted { color:var(--muted); }
+  footer { margin-top:20px; font-size:9pt; color:var(--muted); text-align:center; }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <h1>TB Chat Offline</h1>
+  <p>Design আর পুরো app flow</p>
+  <p style="margin-top:8px;font-size:9.5pt">Design: <a href="https://claude.ai/artifact/C5dWqd5y3SZ6XgJkJVhc24">claude.ai/artifact/C5dWqd5y3SZ6XgJkJVhc24</a></p>
+</div>
+
+<h2>Design</h2>
+<p>তোমার TB Chat-এর theme-ই রেখেছি:</p>
+<div class="chips">
+  <span class="chip">Pink → Purple gradient</span>
+  <span class="chip">Lavender chip</span>
+  <span class="chip">Poppins font</span>
+  <span class="chip">Inter font</span>
+</div>
+<p>মোট ১০টা screen:</p>
+<ul class="grid">
+  <li><span class="num">1</span>Welcome</li>
+  <li><span class="num">2</span>Bluetooth required: system permission চাওয়ার আগের popup</li>
+  <li><span class="num">3</span>Permission denied: এখানে app আটকে থাকবে</li>
+  <li><span class="num">4</span>Chats list</li>
+  <li><span class="num">5</span>Nearby scan: radar দেখাবে</li>
+  <li><span class="num">6</span>Pair request: ৪-digit code মিলিয়ে নিতে হবে</li>
+  <li><span class="num">7</span>Chat</li>
+  <li><span class="num">8</span>Unpair &amp; delete</li>
+  <li><span class="num">9</span>Settings</li>
+  <li><span class="num">10</span>Groups: “Coming soon” দেখাবে</li>
+</ul>
+<p class="muted">কোথাও কোনো নাম নেই, সবার পরিচয় শুধু “Anon 7F3A” এর মতো একটা random ID।</p>
+
+<div class="warn">
+  <h3>⚠️ শুরুর আগে একটা বড় সীমাবদ্ধতা</h3>
+  <p style="margin:4px 0">Internet ছাড়া phone থেকে phone-এ chat করার জন্য best package হলো <code>nearby_connections</code> (Google Nearby)। এটা নিজে থেকেই Bluetooth, BLE আর Wi-Fi hotspot বা Direct-এর মধ্যে যেটা ভালো সেটা বেছে নেয়। কিন্তু এটা শুধু Android-এ চলে।</p>
+  <ul>
+    <li>iPhone-এ এর জায়গায় Multipeer Connectivity লাগবে।</li>
+    <li>Android আর iPhone একে অপরের সাথে offline chat করতে পারবে না। শুধু BLE দিয়ে এটা সম্ভব, কিন্তু সেটা খুব ধীর।</li>
+  </ul>
+  <div class="rec">তাই আমার পরামর্শ: প্রথমে Android-only বানাও।</div>
+</div>
+
+<h2 style="break-before:page">পুরো App Flow</h2>
+
+<div class="step">
+  <h3><span class="num">১</span>App খোলা <span class="tag">Welcome screen</span></h3>
+  <ul>
+    <li>প্রথমবার খুললে একটা random ID তৈরি হবে (uuid)। এটা <code>flutter_secure_storage</code>-এ save থাকবে। নাম হবে “Anon ” আর ID-এর প্রথম ৪টা character।</li>
+  </ul>
+</div>
+
+<div class="step">
+  <h3><span class="num">২</span>Bluetooth gate <span class="tag">Bluetooth required screen</span></h3>
+  <ul>
+    <li>“Get started” চাপলে আগে আমাদের নিজেদের popup দেখাবে, তারপর system permission চাওয়া হবে:
+      <ul>
+        <li>Bluetooth: Scan, Advertise আর Connect</li>
+        <li>Nearby Wi-Fi Devices</li>
+        <li>Location (Android 11 বা তার আগের version-এ)</li>
+      </ul>
+    </li>
+    <li>Bluetooth off থাকলে চালু করতে বলবে।</li>
+  </ul>
+</div>
+
+<div class="step">
+  <h3><span class="num">৩</span>Deny করলে <span class="tag">Permission denied screen</span></h3>
+  <ul>
+    <li>App আর এগোবে না, শুধু “Open settings” আর “Try again” button থাকবে।</li>
+    <li>App যখনই foreground-এ ফিরবে, permission আবার check হবে। চালানোর মাঝখানে কেউ Bluetooth বন্ধ করলেও এই screen-টাই চলে আসবে।</li>
+  </ul>
+</div>
+
+<div class="step">
+  <h3><span class="num">৪</span>Home <span class="tag">Chats screen</span></h3>
+  <ul>
+    <li>Chat list আসবে local database থেকে। কোনো server নেই।</li>
+  </ul>
+</div>
+
+<div class="step">
+  <h3><span class="num">৫</span>Find nearby <span class="tag">Nearby scan screen</span></h3>
+  <ul>
+    <li>একই সাথে <code>startAdvertising</code> আর <code>startDiscovery</code> চলবে। দুটোতেই নাম হিসেবে শুধু Anon ID পাঠানো হবে।</li>
+  </ul>
+</div>
+
+<div class="step">
+  <h3><span class="num">৬</span>Pair <span class="tag">Pair request screen</span></h3>
+  <ul>
+    <li>Pair চাপলে <code>requestConnection</code> যাবে।</li>
+    <li>দুই phone-এই একই ৪-digit code দেখাবে (Nearby থেকে পাওয়া <code>authenticationDigits</code>)।</li>
+    <li>দুজনেই Accept করলে local database-এ নতুন conversation তৈরি হবে।</li>
+  </ul>
+</div>
+
+<div class="step">
+  <h3><span class="num">৭</span>Chat <span class="tag">Chat screen</span></h3>
+  <ul>
+    <li>Message phone থেকে phone-এ যাবে byte payload হিসেবে। নিজের phone-এ save হবে, তারপর ack আসবে।</li>
+    <li>অন্যজন range-এর বাইরে থাকলে message <code>pending</code> থাকবে। আবার connect হলেই নিজে থেকে চলে যাবে।</li>
+  </ul>
+</div>
+
+<div class="step">
+  <h3><span class="num">৮</span>Unpair <span class="tag">Unpair screen</span></h3>
+  <ul>
+    <li>অন্যজনকে একটা <code>unpair</code> signal পাঠানো হবে, তারপর দুই phone থেকেই conversation, সব message আর pairing key delete হয়ে যাবে।</li>
+    <li>অন্যজন যদি তখন range-এর বাইরে থাকে, তাহলে আমার phone থেকে সাথে সাথে delete হবে। ওর phone থেকে delete হবে পরের বার connect হলে।</li>
+  </ul>
+</div>
+
+<div class="step">
+  <h3><span class="num">৯</span>Settings</h3>
+  <ul>
+    <li>নতুন ID নেওয়া, Wi-Fi Direct on বা off, visible on বা off, App lock, আর “Erase everything”।</li>
+  </ul>
+</div>
+
+<footer>TB Chat Offline · Design &amp; App Flow</footer>
+</body>
+</html>
