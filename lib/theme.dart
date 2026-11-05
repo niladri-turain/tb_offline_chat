@@ -17,6 +17,10 @@ class TB {
   static const greenDark = Color(0xFF0B6B4A);
   static const greenSoft = Color(0xFFE8F7F0);
   static const divider = Color(0xFFECEAF5);
+  static const backgroundSoft = Color(0xFFF7F6FC);
+  static const lavenderInput = Color(0xFFF3F1FB);
+  static const switchOff = Color(0xFFD9D5EA);
+  static const violet = Color(0xFF5A1AC8);
   static const borderLavender = Color(0xFFE6E2FA);
 
   static const gradient = LinearGradient(

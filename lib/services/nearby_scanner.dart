@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:device_info_plus/device_info_plus.dart';
@@ -9,6 +10,7 @@ import 'package:permission_handler/permission_handler.dart';
 
 import '../data/chat_db.dart';
 import '../data/identity.dart';
+import 'chat_service.dart';
 
 enum ScanStatus { idle, starting, scanning, permissionDenied, bluetoothOff, locationOff, failed }
 
@@ -84,6 +86,59 @@ class NearbyScanner extends ChangeNotifier {
   /// Peers connected right now: peer ID → endpoint.
   final Map<String, String> connected = {};
 
+  /// Who each live endpoint is. Set before [connected], because the other phone can start
+  /// sending the moment its side of the connection is up.
+  final Map<String, String> _endpointPeers = {};
+
+  /// Peers this phone is reconnecting to on its own.
+  final Set<String> _redialing = {};
+
+  bool isConnected(String peerId) => connected.containsKey(peerId);
+
+  /// Sends one JSON message to a connected peer. False if it couldn't be handed to Nearby.
+  Future<bool> sendTo(String peerId, Map<String, Object?> data) async {
+    final endpointId = connected[peerId];
+    if (endpointId == null) return false;
+    try {
+      await Nearby().sendBytesPayload(endpointId, utf8.encode(jsonEncode(data)));
+      return true;
+    } catch (e) {
+      debugPrint('Send failed: $e');
+      return false;
+    }
+  }
+
+  void disconnectPeer(String peerId) {
+    final endpointId = connected.remove(peerId);
+    if (endpointId == null) return;
+    _endpointPeers.remove(endpointId);
+    Nearby().disconnectFromEndpoint(endpointId);
+    notifyListeners();
+  }
+
+  /// Reconnects to someone already known. Only the lower ID dials, so the two phones don't
+  /// dial each other at once.
+  Future<void> _redial(String endpointId, String peerId) async {
+    if (connected.containsKey(peerId) || _redialing.contains(peerId)) return;
+    if (_connecting.containsValue(peerId) || Identity.myId.compareTo(peerId) > 0) return;
+    final known = await ChatDb.instance.isPaired(peerId) || await ChatDb.instance.needsUnpairNotice(peerId);
+    if (!known) return;
+    _redialing.add(peerId);
+    try {
+      await Nearby().requestConnection(
+        Identity.myId,
+        endpointId,
+        onConnectionInitiated: _onInitiated,
+        onConnectionResult: _onResult,
+        onDisconnected: _onDisconnected,
+      );
+    } catch (e) {
+      debugPrint('Reconnect failed: $e');
+    } finally {
+      _redialing.remove(peerId);
+    }
+  }
+
   bool isWaiting(String endpointId) => _outgoing.contains(endpointId);
 
   Future<void> pair(NearbyPeer peer) async {
@@ -125,6 +180,7 @@ class NearbyScanner extends ChangeNotifier {
       return;
     }
     _connecting[endpointId] = peerId;
+    _endpointPeers[endpointId] = peerId;
     final code = info.authenticationToken.toUpperCase();
     if (await ChatDb.instance.isPaired(peerId)) {
       // Already paired earlier: reconnect without asking again.
@@ -133,37 +189,60 @@ class NearbyScanner extends ChangeNotifier {
       // The user chose to pair, so accept our side and wait for theirs.
       _accept(endpointId);
       _events.add(PairWaiting(endpointId, peerId, code));
-    } else {
+    } else if (await ChatDb.instance.needsUnpairNotice(peerId)) {
+      // They still think we're paired. Connect only to tell them we're not.
+      _accept(endpointId);
+    } else if (_events.hasListener) {
       _events.add(PairRequested(endpointId, peerId, code));
+    } else {
+      // The radios also run outside Nearby to keep paired chats alive, but only Nearby can ask the user.
+      declineRequest(endpointId);
     }
   }
 
   void _accept(String endpointId) {
     Nearby().acceptConnection(
       endpointId,
-      // Messages arrive here once chat is built.
-      onPayLoadRecieved: (_, _) {},
+      onPayLoadRecieved: (endpoint, payload) {
+        final peerId = _endpointPeers[endpoint];
+        final bytes = payload.bytes;
+        if (peerId != null && payload.type == PayloadType.BYTES && bytes != null) {
+          ChatService.instance.onPayload(peerId, bytes);
+        }
+      },
     );
   }
 
   Future<void> _onResult(String endpointId, Status result) async {
     final peerId = _connecting.remove(endpointId);
-    _outgoing.remove(endpointId);
+    final chosen = _outgoing.remove(endpointId);
     if (peerId == null) return notifyListeners();
+    final db = ChatDb.instance;
     if (result == Status.CONNECTED) {
       connected[peerId] = endpointId;
-      if (await ChatDb.instance.pairDirect(Identity.myId, peerId)) {
+      if (!chosen && await db.needsUnpairNotice(peerId)) {
+        await ChatService.instance.sendUnpairNotice(peerId);
+        return notifyListeners();
+      }
+      if (await db.pairDirect(Identity.myId, peerId)) {
         _events.add(PairFinished(endpointId, peerId, paired: true));
       }
+      notifyListeners();
+      await ChatService.instance.onConnected(peerId);
     } else {
-      _events.add(PairFinished(endpointId, peerId, paired: false));
+      _endpointPeers.remove(endpointId);
+      // A failed reconnect isn't a failed pairing; the next scan tries again.
+      if (!await db.isPaired(peerId)) _events.add(PairFinished(endpointId, peerId, paired: false));
+      notifyListeners();
     }
-    notifyListeners();
   }
 
   void _onDisconnected(String endpointId) {
+    _endpointPeers.remove(endpointId);
     connected.removeWhere((_, e) => e == endpointId);
     notifyListeners();
+    // Nearby won't report this phone as found again by itself, so look again to reconnect.
+    if (_holders > 0) rescan();
   }
 
   void acquire() {
@@ -265,6 +344,7 @@ class NearbyScanner extends ChangeNotifier {
           _found.removeWhere((_, p) => p.peerId == name);
           _found[endpointId] = NearbyPeer(endpointId, name);
           notifyListeners();
+          _redial(endpointId, name);
         },
         onEndpointLost: (endpointId) {
           if (_found.remove(endpointId) != null) notifyListeners();

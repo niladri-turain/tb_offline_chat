@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/chat_db.dart';
 import '../data/identity.dart';
 import '../theme.dart';
+import 'chat_screen.dart';
 
 class ChatsScreen extends StatefulWidget {
   const ChatsScreen({super.key, required this.onFindNearby});
@@ -211,6 +212,8 @@ class _ChatList extends StatelessWidget {
           itemBuilder: (context, i) {
             final c = chats[i];
             return ListTile(
+              onTap: () => Navigator.of(context)
+                  .push(MaterialPageRoute<void>(builder: (_) => ChatScreen(peerId: c.peerId))),
               contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               leading: AnonAvatar(peerId: c.peerId, size: 52),
               title: Row(
@@ -225,11 +228,16 @@ class _ChatList extends StatelessWidget {
               subtitle: Row(
                 children: [
                   Expanded(
-                    child: Text(c.lastMessage ?? 'Paired · say hi',
+                    child: Text(c.lastMessage ?? (c.unpaired ? 'No messages' : 'Paired · say hi'),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(fontSize: 14, color: TB.muted)),
                   ),
+                  if (c.unpaired)
+                    const Padding(
+                      padding: EdgeInsets.only(left: 8),
+                      child: Text('Unpaired', style: TextStyle(fontSize: 12, color: TB.pinkDark)),
+                    ),
                   if (c.unread > 0)
                     Container(
                       margin: const EdgeInsets.only(left: 8),

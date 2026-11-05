@@ -53,10 +53,10 @@ class WelcomeScreen extends StatelessWidget {
                     const SizedBox(height: 14),
                     const FeatureTile(
                       boxed: true,
-                      icon: Icons.delete_outline,
+                      icon: Icons.lock_outline,
                       iconColor: TB.indigo,
-                      title: 'Nothing is kept',
-                      subtitle: 'Unpair and every message is erased',
+                      title: 'Stays on your phone',
+                      subtitle: 'Chats are saved only here, never online',
                     ),
                     const Spacer(),
                     const SizedBox(height: 24),
