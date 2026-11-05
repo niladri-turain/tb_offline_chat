@@ -193,16 +193,26 @@ class NearbyScanner extends ChangeNotifier {
   Future<int> _sdk() async =>
       Platform.isAndroid ? (await DeviceInfoPlugin().androidInfo).version.sdkInt : 0;
 
-  /// Asks for everything scanning needs. Also used by the first-launch Bluetooth sheet.
-  Future<Map<Permission, PermissionStatus>> requestPermissions() async {
+  Future<List<Permission>> _neededPermissions() async {
     final sdk = await _sdk();
-    final needed = <Permission>[
+    return [
       if (sdk >= 31) ...[Permission.bluetoothScan, Permission.bluetoothAdvertise, Permission.bluetoothConnect],
       if (sdk >= 33) Permission.nearbyWifiDevices,
       // Google Nearby refuses to discover without location permission, on every Android version.
       Permission.location,
     ];
-    return needed.request();
+  }
+
+  /// Asks for everything scanning needs. Also used by the first-launch Bluetooth sheet.
+  Future<Map<Permission, PermissionStatus>> requestPermissions() async =>
+      (await _neededPermissions()).request();
+
+  /// Whether everything scanning needs is already allowed. Never shows a dialog.
+  Future<bool> hasPermissions() async {
+    for (final permission in await _neededPermissions()) {
+      if (!await permission.isGranted) return false;
+    }
+    return true;
   }
 
   /// Turns Bluetooth on if it's off. False if it couldn't be turned on.

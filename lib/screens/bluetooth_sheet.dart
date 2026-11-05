@@ -1,10 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:permission_handler/permission_handler.dart';
 
-import '../data/identity.dart';
-import '../services/nearby_scanner.dart';
 import '../theme.dart';
-import 'home_shell.dart';
+import 'permission_denied_screen.dart';
 
 /// Our own explanation, shown before the system permission dialogs on first launch.
 class BluetoothSheet extends StatefulWidget {
@@ -24,16 +21,12 @@ class BluetoothSheet extends StatefulWidget {
 class _BluetoothSheetState extends State<BluetoothSheet> {
   bool _busy = false;
 
-  // If something is refused, the Nearby tab explains it and offers the fix.
   Future<void> _allow() async {
     setState(() => _busy = true);
     final navigator = Navigator.of(context);
-    final scanner = NearbyScanner.instance;
-    final results = await scanner.requestPermissions();
-    if (results.values.every((s) => s.isGranted)) await scanner.ensureBluetoothOn();
-    await Identity.finishOnboarding();
-    if (!mounted) return;
-    navigator.pushAndRemoveUntil(MaterialPageRoute<void>(builder: (_) => const HomeShell()), (_) => false);
+    if (await requestAccessAndEnter(navigator)) return;
+    navigator.pushAndRemoveUntil(
+        MaterialPageRoute<void>(builder: (_) => const PermissionDeniedScreen()), (_) => false);
   }
 
   @override

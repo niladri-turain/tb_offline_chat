@@ -17,6 +17,7 @@ class TB {
   static const greenDark = Color(0xFF0B6B4A);
   static const greenSoft = Color(0xFFE8F7F0);
   static const divider = Color(0xFFECEAF5);
+  static const borderLavender = Color(0xFFE6E2FA);
 
   static const gradient = LinearGradient(
     colors: [pink, purple, indigo],
