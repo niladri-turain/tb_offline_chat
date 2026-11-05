@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'data/chat_db.dart';
 import 'data/identity.dart';
 import 'screens/home_shell.dart';
+import 'screens/welcome_screen.dart';
 import 'theme.dart';
 
 Future<void> main() async {
@@ -21,7 +22,7 @@ class TbChatApp extends StatelessWidget {
       title: 'TB Chat',
       debugShowCheckedModeBanner: false,
       theme: TB.theme(),
-      home: const HomeShell(),
+      home: Identity.onboarded ? const HomeShell() : const WelcomeScreen(),
     );
   }
 }

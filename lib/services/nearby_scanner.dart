@@ -193,10 +193,8 @@ class NearbyScanner extends ChangeNotifier {
   Future<int> _sdk() async =>
       Platform.isAndroid ? (await DeviceInfoPlugin().androidInfo).version.sdkInt : 0;
 
-  Future<void> _start() async {
-    if (_holders == 0 || status == ScanStatus.scanning) return;
-    _set(ScanStatus.starting);
-
+  /// Asks for everything scanning needs. Also used by the first-launch Bluetooth sheet.
+  Future<Map<Permission, PermissionStatus>> requestPermissions() async {
     final sdk = await _sdk();
     final needed = <Permission>[
       if (sdk >= 31) ...[Permission.bluetoothScan, Permission.bluetoothAdvertise, Permission.bluetoothConnect],
@@ -204,19 +202,32 @@ class NearbyScanner extends ChangeNotifier {
       // Google Nearby refuses to discover without location permission, on every Android version.
       Permission.location,
     ];
-    final results = await needed.request();
+    return needed.request();
+  }
+
+  /// Turns Bluetooth on if it's off. False if it couldn't be turned on.
+  Future<bool> ensureBluetoothOn() async {
+    if (await FlutterBluePlus.adapterState.first == BluetoothAdapterState.on) return true;
+    try {
+      await FlutterBluePlus.turnOn();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> _start() async {
+    if (_holders == 0 || status == ScanStatus.scanning) return;
+    _set(ScanStatus.starting);
+
+    final sdk = await _sdk();
+    final results = await requestPermissions();
     if (results.values.any((s) => !s.isGranted)) {
       permanentlyDenied = results.values.any((s) => s.isPermanentlyDenied);
       return _set(ScanStatus.permissionDenied);
     }
 
-    if (await FlutterBluePlus.adapterState.first != BluetoothAdapterState.on) {
-      try {
-        await FlutterBluePlus.turnOn();
-      } catch (_) {
-        return _set(ScanStatus.bluetoothOff);
-      }
-    }
+    if (!await ensureBluetoothOn()) return _set(ScanStatus.bluetoothOff);
 
     if (sdk <= 32 && !await Permission.location.serviceStatus.isEnabled) {
       return _set(ScanStatus.locationOff);

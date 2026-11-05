@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../theme.dart';
 import 'chats_screen.dart';
+import 'groups_screen.dart';
 import 'nearby_screen.dart';
 
 class HomeShell extends StatefulWidget {
@@ -20,7 +21,7 @@ class _HomeShellState extends State<HomeShell> {
     final body = switch (_tab) {
       0 => ChatsScreen(onFindNearby: () => setState(() => _tab = 1)),
       1 => const NearbyScreen(),
-      2 => const _ComingSoon(title: 'Groups', text: 'Anonymous group chats with people nearby.'),
+      2 => const GroupsScreen(),
       _ => const _ComingSoon(title: 'Settings', text: 'Your anonymous ID and privacy options.'),
     };
     return Scaffold(

@@ -23,6 +23,14 @@ class TB {
     stops: [0, 0.55, 1],
   );
 
+  /// Diagonal version of [gradient], for cards and icon tiles.
+  static const brandGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [pink, purple, indigo],
+    stops: [0, 0.6, 1],
+  );
+
   static const display = 'Poppins';
   static const body = 'Inter';
 
@@ -76,6 +84,62 @@ class GradientButton extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Lavender row with an icon, a title and one line of explanation.
+///
+/// [boxed] puts the icon in a white rounded square (Welcome); otherwise it sits bare (Bluetooth sheet).
+class FeatureTile extends StatelessWidget {
+  const FeatureTile({
+    super.key,
+    required this.icon,
+    required this.iconColor,
+    required this.title,
+    required this.subtitle,
+    this.boxed = false,
+  });
+
+  final IconData icon;
+  final Color iconColor;
+  final String title;
+  final String subtitle;
+  final bool boxed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: boxed
+          ? const EdgeInsets.symmetric(horizontal: 16, vertical: 14)
+          : const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(color: TB.lavenderSoft, borderRadius: BorderRadius.circular(boxed ? 16 : 14)),
+      child: Row(
+        crossAxisAlignment: boxed ? CrossAxisAlignment.center : CrossAxisAlignment.start,
+        children: [
+          if (boxed)
+            Container(
+              width: 40,
+              height: 40,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+              child: Icon(icon, color: iconColor, size: 22),
+            )
+          else
+            Padding(padding: const EdgeInsets.only(top: 1), child: Icon(icon, color: iconColor, size: 22)),
+          SizedBox(width: boxed ? 14 : 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title,
+                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: boxed ? 15 : 14, color: TB.ink)),
+                Text(subtitle, style: const TextStyle(fontSize: 13, color: TB.muted)),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
