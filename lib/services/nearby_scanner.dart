@@ -10,11 +10,13 @@ import 'package:permission_handler/permission_handler.dart';
 
 import '../data/chat_db.dart';
 import '../data/identity.dart';
+import 'ble_link.dart';
 import 'chat_service.dart';
 
 enum ScanStatus { idle, starting, scanning, permissionDenied, bluetoothOff, locationOff, failed }
 
-/// Someone with TB Chat open nearby, seen through Nearby Connections (Bluetooth, BLE and Wi-Fi).
+/// Someone with TB Chat open nearby, seen through Nearby Connections (Android to Android)
+/// or [BleLink] (anything with an iPhone in it).
 class NearbyPeer {
   NearbyPeer(this.endpointId, this.peerId);
 
@@ -53,7 +55,8 @@ class PairFinished extends PairEvent {
 }
 
 /// Advertises this phone and discovers other TB Chat phones, with no internet.
-/// Only the anonymous ID is broadcast.
+/// Only the anonymous ID is broadcast. Android runs Nearby and BLE side by side; iOS runs BLE only,
+/// because Nearby has no iOS version here. An endpoint belongs to BLE if [BleLink.owns] says so.
 ///
 /// One app-wide instance: screens call [acquire] when they open and [release] when they close,
 /// and the radios run while at least one screen holds it. When a screen is rebuilt, the new
@@ -71,6 +74,15 @@ class NearbyScanner extends ChangeNotifier {
   int _holders = 0;
   // Start and stop run one after another; overlapping them makes Nearby fail with ALREADY_DISCOVERING.
   Future<void> _queue = Future.value();
+
+  late final _ble = BleLink(
+    onFound: _onPeerFound,
+    onLost: _onPeerLost,
+    onInitiated: (endpoint, peerId, code) => _onInitiated(endpoint, ConnectionInfo(peerId, code, false)),
+    onResult: (endpoint, connected) => _onResult(endpoint, connected ? Status.CONNECTED : Status.ERROR),
+    onDisconnected: _onDisconnected,
+    onPayload: _onBytes,
+  );
 
   List<NearbyPeer> get peers => _found.values.toList();
 
@@ -100,7 +112,12 @@ class NearbyScanner extends ChangeNotifier {
     final endpointId = connected[peerId];
     if (endpointId == null) return false;
     try {
-      await Nearby().sendBytesPayload(endpointId, utf8.encode(jsonEncode(data)));
+      final bytes = utf8.encode(jsonEncode(data));
+      if (BleLink.owns(endpointId)) {
+        await _ble.send(endpointId, bytes);
+      } else {
+        await Nearby().sendBytesPayload(endpointId, bytes);
+      }
       return true;
     } catch (e) {
       debugPrint('Send failed: $e');
@@ -112,8 +129,27 @@ class NearbyScanner extends ChangeNotifier {
     final endpointId = connected.remove(peerId);
     if (endpointId == null) return;
     _endpointPeers.remove(endpointId);
-    Nearby().disconnectFromEndpoint(endpointId);
+    _hangUp(endpointId);
     notifyListeners();
+  }
+
+  void _hangUp(String endpointId) {
+    if (BleLink.owns(endpointId)) {
+      _ble.disconnect(endpointId);
+    } else {
+      Nearby().disconnectFromEndpoint(endpointId);
+    }
+  }
+
+  Future<void> _dial(String endpointId) {
+    if (BleLink.owns(endpointId)) return _ble.connect(endpointId);
+    return Nearby().requestConnection(
+      Identity.myId,
+      endpointId,
+      onConnectionInitiated: _onInitiated,
+      onConnectionResult: _onResult,
+      onDisconnected: _onDisconnected,
+    );
   }
 
   /// Reconnects to someone already known. Only the lower ID dials, so the two phones don't
@@ -125,13 +161,7 @@ class NearbyScanner extends ChangeNotifier {
     if (!known) return;
     _redialing.add(peerId);
     try {
-      await Nearby().requestConnection(
-        Identity.myId,
-        endpointId,
-        onConnectionInitiated: _onInitiated,
-        onConnectionResult: _onResult,
-        onDisconnected: _onDisconnected,
-      );
+      await _dial(endpointId);
     } catch (e) {
       debugPrint('Reconnect failed: $e');
     } finally {
@@ -145,13 +175,7 @@ class NearbyScanner extends ChangeNotifier {
     _outgoing.add(peer.endpointId);
     notifyListeners();
     try {
-      await Nearby().requestConnection(
-        Identity.myId,
-        peer.endpointId,
-        onConnectionInitiated: _onInitiated,
-        onConnectionResult: _onResult,
-        onDisconnected: _onDisconnected,
-      );
+      await _dial(peer.endpointId);
     } catch (e) {
       debugPrint('Pair request failed: $e');
       _outgoing.remove(peer.endpointId);
@@ -164,19 +188,27 @@ class NearbyScanner extends ChangeNotifier {
 
   void declineRequest(String endpointId) {
     _connecting.remove(endpointId);
-    Nearby().rejectConnection(endpointId);
+    _reject(endpointId);
+  }
+
+  void _reject(String endpointId) {
+    if (BleLink.owns(endpointId)) {
+      _ble.disconnect(endpointId);
+    } else {
+      Nearby().rejectConnection(endpointId);
+    }
   }
 
   void cancelPair(String endpointId) {
     _outgoing.remove(endpointId);
-    Nearby().disconnectFromEndpoint(endpointId);
+    _hangUp(endpointId);
     notifyListeners();
   }
 
   Future<void> _onInitiated(String endpointId, ConnectionInfo info) async {
     final peerId = info.endpointName;
     if (!_idPattern.hasMatch(peerId)) {
-      Nearby().rejectConnection(endpointId);
+      _reject(endpointId);
       return;
     }
     _connecting[endpointId] = peerId;
@@ -201,16 +233,32 @@ class NearbyScanner extends ChangeNotifier {
   }
 
   void _accept(String endpointId) {
+    if (BleLink.owns(endpointId)) return _ble.accept(endpointId);
     Nearby().acceptConnection(
       endpointId,
       onPayLoadRecieved: (endpoint, payload) {
-        final peerId = _endpointPeers[endpoint];
         final bytes = payload.bytes;
-        if (peerId != null && payload.type == PayloadType.BYTES && bytes != null) {
-          ChatService.instance.onPayload(peerId, bytes);
-        }
+        if (payload.type == PayloadType.BYTES && bytes != null) _onBytes(endpoint, bytes);
       },
     );
+  }
+
+  void _onBytes(String endpointId, Uint8List bytes) {
+    final peerId = _endpointPeers[endpointId];
+    if (peerId != null) ChatService.instance.onPayload(peerId, bytes);
+  }
+
+  void _onPeerFound(String endpointId, String peerId) {
+    // When the other phone restarts its scan it gets a new endpoint before the old one is
+    // reported lost; keep only the newest so one person shows once.
+    _found.removeWhere((_, p) => p.peerId == peerId);
+    _found[endpointId] = NearbyPeer(endpointId, peerId);
+    notifyListeners();
+    _redial(endpointId, peerId);
+  }
+
+  void _onPeerLost(String endpointId) {
+    if (_found.remove(endpointId) != null) notifyListeners();
   }
 
   Future<void> _onResult(String endpointId, Status result) async {
@@ -273,6 +321,7 @@ class NearbyScanner extends ChangeNotifier {
       Platform.isAndroid ? (await DeviceInfoPlugin().androidInfo).version.sdkInt : 0;
 
   Future<List<Permission>> _neededPermissions() async {
+    if (Platform.isIOS) return [Permission.bluetooth];
     final sdk = await _sdk();
     return [
       if (sdk >= 31) ...[Permission.bluetoothScan, Permission.bluetoothAdvertise, Permission.bluetoothConnect],
@@ -296,7 +345,13 @@ class NearbyScanner extends ChangeNotifier {
 
   /// Turns Bluetooth on if it's off. False if it couldn't be turned on.
   Future<bool> ensureBluetoothOn() async {
-    if (await FlutterBluePlus.adapterState.first == BluetoothAdapterState.on) return true;
+    // iOS reports "unknown" for a moment after launch.
+    final state = await FlutterBluePlus.adapterState
+        .firstWhere((s) => s != BluetoothAdapterState.unknown)
+        .timeout(const Duration(seconds: 3), onTimeout: () => BluetoothAdapterState.unknown);
+    if (state == BluetoothAdapterState.on) return true;
+    // Only Android lets an app switch Bluetooth on.
+    if (!Platform.isAndroid) return false;
     try {
       await FlutterBluePlus.turnOn();
       return true;
@@ -318,43 +373,49 @@ class NearbyScanner extends ChangeNotifier {
 
     if (!await ensureBluetoothOn()) return _set(ScanStatus.bluetoothOff);
 
-    if (sdk <= 32 && !await Permission.location.serviceStatus.isEnabled) {
+    if (Platform.isAndroid && sdk <= 32 && !await Permission.location.serviceStatus.isEnabled) {
       return _set(ScanStatus.locationOff);
     }
 
     await _stopRadios();
     _found.clear();
     try {
-      await Nearby().startAdvertising(
-        Identity.myId,
-        Strategy.P2P_CLUSTER,
-        serviceId: serviceId,
-        onConnectionInitiated: _onInitiated,
-        onConnectionResult: _onResult,
-        onDisconnected: _onDisconnected,
-      );
-      await Nearby().startDiscovery(
-        Identity.myId,
-        Strategy.P2P_CLUSTER,
-        serviceId: serviceId,
-        onEndpointFound: (endpointId, name, foundServiceId) {
-          if (foundServiceId != serviceId || !_idPattern.hasMatch(name) || name == Identity.myId) return;
-          // When the other phone restarts its scan it gets a new endpoint before the old one is
-          // reported lost; keep only the newest so one person shows once.
-          _found.removeWhere((_, p) => p.peerId == name);
-          _found[endpointId] = NearbyPeer(endpointId, name);
-          notifyListeners();
-          _redial(endpointId, name);
-        },
-        onEndpointLost: (endpointId) {
-          if (_found.remove(endpointId) != null) notifyListeners();
-        },
-      );
-      _set(ScanStatus.scanning);
+      if (Platform.isAndroid) await _startNearby();
     } catch (e) {
       debugPrint('Nearby start failed: $e');
-      _set(ScanStatus.failed);
+      return _set(ScanStatus.failed);
     }
+    try {
+      await _ble.startRadios();
+    } catch (e) {
+      debugPrint('BLE start failed: $e');
+      // An Android phone that can't advertise over BLE still reaches other Android phones.
+      if (!Platform.isAndroid) return _set(ScanStatus.failed);
+    }
+    _set(ScanStatus.scanning);
+  }
+
+  Future<void> _startNearby() async {
+    await Nearby().startAdvertising(
+      Identity.myId,
+      Strategy.P2P_CLUSTER,
+      serviceId: serviceId,
+      onConnectionInitiated: _onInitiated,
+      onConnectionResult: _onResult,
+      onDisconnected: _onDisconnected,
+    );
+    await Nearby().startDiscovery(
+      Identity.myId,
+      Strategy.P2P_CLUSTER,
+      serviceId: serviceId,
+      onEndpointFound: (endpointId, name, foundServiceId) {
+        if (foundServiceId != serviceId || !_idPattern.hasMatch(name) || name == Identity.myId) return;
+        _onPeerFound(endpointId, name);
+      },
+      onEndpointLost: (endpointId) {
+        if (endpointId != null) _onPeerLost(endpointId);
+      },
+    );
   }
 
   Future<void> _stop() async {
@@ -364,6 +425,10 @@ class NearbyScanner extends ChangeNotifier {
   }
 
   Future<void> _stopRadios() async {
+    try {
+      await _ble.stopRadios();
+    } catch (_) {}
+    if (!Platform.isAndroid) return;
     try {
       await Nearby().stopDiscovery();
       await Nearby().stopAdvertising();

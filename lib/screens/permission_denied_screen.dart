@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -99,21 +101,27 @@ class _PermissionDeniedScreenState extends State<PermissionDeniedScreen> {
                           border: Border.all(color: TB.borderLavender),
                           borderRadius: BorderRadius.circular(18),
                         ),
-                        child: const Column(
+                        child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('HOW TO FIX',
+                            const Text('HOW TO FIX',
                                 style: TextStyle(
                                     fontWeight: FontWeight.w600,
                                     fontSize: 12,
                                     letterSpacing: 0.6,
                                     color: TB.muted)),
-                            SizedBox(height: 14),
-                            _FixStep(number: 1, before: 'Tap ', bold: 'Open settings', after: ' below'),
-                            SizedBox(height: 14),
-                            _FixStep(number: 2, before: 'Go to ', bold: 'Permissions → Nearby devices'),
-                            SizedBox(height: 14),
-                            _FixStep(number: 3, before: 'Choose ', bold: 'Allow', after: ', then return to TB Chat'),
+                            const SizedBox(height: 14),
+                            const _FixStep(number: 1, before: 'Tap ', bold: 'Open settings', after: ' below'),
+                            const SizedBox(height: 14),
+                            if (Platform.isIOS) ...[
+                              const _FixStep(number: 2, before: 'Turn on ', bold: 'Bluetooth'),
+                              const SizedBox(height: 14),
+                              const _FixStep(number: 3, before: 'Return to ', bold: 'TB Chat'),
+                            ] else ...[
+                              const _FixStep(number: 2, before: 'Go to ', bold: 'Permissions → Nearby devices'),
+                              const SizedBox(height: 14),
+                              const _FixStep(number: 3, before: 'Choose ', bold: 'Allow', after: ', then return to TB Chat'),
+                            ],
                           ],
                         ),
                       ),
