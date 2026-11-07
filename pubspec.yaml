@@ -1,5 +1,5 @@
-name: tb_offline_chat
-description: "TB Chat Offline: anonymous phone-to-phone chat without internet."
+name: tb_chat
+description: "A new Flutter project."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -34,8 +34,15 @@ dependencies:
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
-  go_router: ^17.5.0
-  flutter_svg: ^2.3.2
+  nearby_connections: ^4.3.0
+  permission_handler: ^12.0.1
+  sqflite: ^2.4.2+1
+  path: ^1.9.1
+  flutter_secure_storage: ^11.2.0
+  uuid: ^4.6.0
+  flutter_blue_plus: ^2.3.14
+  device_info_plus: ^13.3.0
+  cryptography: ^2.9.0
 
 dev_dependencies:
   flutter_test:
@@ -58,25 +65,6 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
-
-  assets:
-    - assets/icons/
-
-  fonts:
-    - family: Poppins
-      fonts:
-        - asset: assets/fonts/Poppins-SemiBold.ttf
-          weight: 600
-        - asset: assets/fonts/Poppins-Bold.ttf
-          weight: 700
-    - family: Inter
-      fonts:
-        - asset: assets/fonts/Inter-Regular.ttf
-          weight: 400
-        - asset: assets/fonts/Inter-Medium.ttf
-          weight: 500
-        - asset: assets/fonts/Inter-SemiBold.ttf
-          weight: 600
 
   # To add assets to your application, add an assets section, like this:
   # assets:
@@ -108,3 +96,13 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+  fonts:
+    - family: Poppins
+      fonts:
+        - asset: assets/fonts/Poppins-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Poppins-Bold.ttf
+          weight: 700
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter.ttf

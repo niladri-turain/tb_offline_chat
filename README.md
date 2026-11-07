@@ -1,4 +1,4 @@
-# tb_offline_chat
+# tb_chat
 
 A new Flutter project.
 
