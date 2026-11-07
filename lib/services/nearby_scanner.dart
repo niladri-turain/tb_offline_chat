@@ -133,6 +133,21 @@ class NearbyScanner extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Drops a blocked peer from the nearby list and from any connection still being set up.
+  void forgetPeer(String peerId) {
+    _found.removeWhere((_, p) => p.peerId == peerId);
+    final settingUp = [
+      for (final e in _connecting.entries)
+        if (e.value == peerId) e.key
+    ];
+    for (final endpointId in settingUp) {
+      _endpointPeers.remove(endpointId);
+      _outgoing.remove(endpointId);
+      declineRequest(endpointId);
+    }
+    notifyListeners();
+  }
+
   void _hangUp(String endpointId) {
     if (BleLink.owns(endpointId)) {
       _ble.disconnect(endpointId);
@@ -207,7 +222,7 @@ class NearbyScanner extends ChangeNotifier {
 
   Future<void> _onInitiated(String endpointId, ConnectionInfo info) async {
     final peerId = info.endpointName;
-    if (!_idPattern.hasMatch(peerId)) {
+    if (!_idPattern.hasMatch(peerId) || ChatDb.instance.isBlocked(peerId)) {
       _reject(endpointId);
       return;
     }
@@ -249,6 +264,7 @@ class NearbyScanner extends ChangeNotifier {
   }
 
   void _onPeerFound(String endpointId, String peerId) {
+    if (ChatDb.instance.isBlocked(peerId)) return;
     // When the other phone restarts its scan it gets a new endpoint before the old one is
     // reported lost; keep only the newest so one person shows once.
     _found.removeWhere((_, p) => p.peerId == peerId);
@@ -267,6 +283,12 @@ class NearbyScanner extends ChangeNotifier {
     if (peerId == null) return notifyListeners();
     final db = ChatDb.instance;
     if (result == Status.CONNECTED) {
+      // Blocked while the connection was being set up: pairing now would undo the block.
+      if (db.isBlocked(peerId)) {
+        _endpointPeers.remove(endpointId);
+        _hangUp(endpointId);
+        return notifyListeners();
+      }
       connected[peerId] = endpointId;
       if (!chosen && await db.needsUnpairNotice(peerId)) {
         await ChatService.instance.sendUnpairNotice(peerId);

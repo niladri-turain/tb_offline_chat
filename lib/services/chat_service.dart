@@ -47,6 +47,7 @@ class ChatService {
   }
 
   Future<void> onPayload(String peerId, Uint8List bytes) async {
+    if (_db.isBlocked(peerId)) return;
     final Object? data;
     try {
       data = jsonDecode(utf8.decode(bytes));
@@ -74,6 +75,26 @@ class ChatService {
   Future<void> unpair(String peerId) async {
     await _db.unpair(peerId, noticePending: true);
     if (_scanner.isConnected(peerId)) await sendUnpairNotice(peerId);
+  }
+
+  /// Ends the pairing and refuses this peer from now on. They only see an unpair, and only if
+  /// they're connected right now: a blocked phone is never connected to again just to tell it.
+  Future<void> block(String peerId) async {
+    final connected = _scanner.isConnected(peerId);
+    await _db.block(peerId);
+    // A pending notice also keeps the radios on until it has gone out.
+    await _db.unpair(peerId, noticePending: connected);
+    _scanner.forgetPeer(peerId);
+    if (connected) {
+      await sendUnpairNotice(peerId);
+      await _db.unpairNoticeSent(peerId);
+    }
+  }
+
+  Future<void> unblock(String peerId) async {
+    await _db.unblock(peerId);
+    // The radios only report someone once, so look again for anyone who was being ignored.
+    await _scanner.rescan();
   }
 
   Future<void> sendUnpairNotice(String peerId) async {

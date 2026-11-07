@@ -22,7 +22,7 @@ Future<void> showUnpairedDialog(BuildContext context, String peerId) => showDial
       ),
     );
 
-enum _ChatAction { unpair, clear }
+enum _ChatAction { unpair, block, clear }
 
 /// One-to-one chat. Stays readable after unpairing, but nothing can be sent.
 class ChatScreen extends StatefulWidget {
@@ -40,6 +40,7 @@ class _ChatScreenState extends State<ChatScreen> {
   late final _conversation = ChatDb.directId(Identity.myId, widget.peerId);
   List<ChatMessage> _messages = [];
   bool _paired = true;
+  bool _blocked = false;
 
   @override
   void initState() {
@@ -66,6 +67,7 @@ class _ChatScreenState extends State<ChatScreen> {
       setState(() {
         _messages = messages;
         _paired = paired;
+        _blocked = _db.isBlocked(widget.peerId);
       });
     }
   }
@@ -75,17 +77,44 @@ class _ChatScreenState extends State<ChatScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _OptionsSheet(peerId: widget.peerId),
+      builder: (_) => _OptionsSheet(peerId: widget.peerId, paired: _paired),
     );
     switch (action) {
       case _ChatAction.unpair:
         await ChatService.instance.unpair(widget.peerId);
         if (mounted) await showUnpairedDialog(context, widget.peerId);
+      case _ChatAction.block:
+        await _confirmBlock();
       case _ChatAction.clear:
         await _confirmClear();
       case null:
         break;
     }
+  }
+
+  Future<void> _confirmBlock() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+        title: Text('Block ${anonName(widget.peerId)}?', style: Theme.of(context).textTheme.titleMedium),
+        content: Text(
+          "You won't see them in Nearby and they can't connect to you. They won't be told you blocked "
+          'them. This chat stays saved on your phone. You can unblock them in Settings.',
+          style: Theme.of(context).textTheme.bodyLarge,
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: TB.pinkDark),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Block'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) await ChatService.instance.block(widget.peerId);
   }
 
   Future<void> _confirmClear() async {
@@ -123,8 +152,9 @@ class _ChatScreenState extends State<ChatScreen> {
           _Header(
             peerId: widget.peerId,
             paired: _paired,
+            blocked: _blocked,
             connected: _scanner.isConnected(widget.peerId),
-            onMore: _paired ? _openOptions : _confirmClear,
+            onMore: _blocked ? _confirmClear : _openOptions,
           ),
           Expanded(
             child: ListView.builder(
@@ -142,8 +172,13 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
           if (_paired)
             _InputBar(onSend: (text) => ChatService.instance.send(widget.peerId, text))
+          else if (_blocked)
+            const _UnpairedBar(label: "Blocked · you can't send messages")
           else
-            _UnpairedBar(onTap: () => showUnpairedDialog(context, widget.peerId)),
+            _UnpairedBar(
+              label: "Unpaired · you can't send messages",
+              onTap: () => showUnpairedDialog(context, widget.peerId),
+            ),
         ],
       ),
     );
@@ -151,10 +186,17 @@ class _ChatScreenState extends State<ChatScreen> {
 }
 
 class _Header extends StatelessWidget {
-  const _Header({required this.peerId, required this.paired, required this.connected, required this.onMore});
+  const _Header({
+    required this.peerId,
+    required this.paired,
+    required this.blocked,
+    required this.connected,
+    required this.onMore,
+  });
 
   final String peerId;
   final bool paired;
+  final bool blocked;
   final bool connected;
   final VoidCallback onMore;
 
@@ -189,7 +231,7 @@ class _Header extends StatelessWidget {
                         CircleAvatar(radius: 3.5, backgroundColor: online ? TB.green : TB.switchOff),
                         const SizedBox(width: 6),
                         Text(
-                          !paired ? 'Unpaired' : (connected ? 'Connected' : 'Out of range'),
+                          blocked ? 'Blocked' : (!paired ? 'Unpaired' : (connected ? 'Connected' : 'Out of range')),
                           style: TextStyle(fontSize: 12, color: online ? TB.greenDark : TB.muted),
                         ),
                       ],
@@ -372,9 +414,10 @@ class _InputBarState extends State<_InputBar> {
 
 /// Takes the place of the input bar once the pairing has ended.
 class _UnpairedBar extends StatelessWidget {
-  const _UnpairedBar({required this.onTap});
+  const _UnpairedBar({required this.label, this.onTap});
 
-  final VoidCallback onTap;
+  final String label;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -382,18 +425,18 @@ class _UnpairedBar extends StatelessWidget {
       color: TB.pinkSoft,
       child: InkWell(
         onTap: onTap,
-        child: const SafeArea(
+        child: SafeArea(
           top: false,
           child: Padding(
-            padding: EdgeInsets.all(16),
+            padding: const EdgeInsets.all(16),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.link_off, size: 18, color: TB.pinkDark),
-                SizedBox(width: 8),
+                const Icon(Icons.link_off, size: 18, color: TB.pinkDark),
+                const SizedBox(width: 8),
                 Flexible(
-                  child: Text("Unpaired · you can't send messages",
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: TB.pinkDark)),
+                  child: Text(label,
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: TB.pinkDark)),
                 ),
               ],
             ),
@@ -406,9 +449,10 @@ class _UnpairedBar extends StatelessWidget {
 
 /// Unpair or clear this chat. Pops the chosen action, or null for Cancel.
 class _OptionsSheet extends StatelessWidget {
-  const _OptionsSheet({required this.peerId});
+  const _OptionsSheet({required this.peerId, required this.paired});
 
   final String peerId;
+  final bool paired;
 
   @override
   Widget build(BuildContext context) {
@@ -433,27 +477,46 @@ class _OptionsSheet extends StatelessWidget {
                 child: const Icon(Icons.link_off, size: 32, color: TB.pinkDark),
               ),
               const SizedBox(height: 18),
-              Text('Unpair ${anonName(peerId)}?',
+              Text(paired ? 'Unpair ${anonName(peerId)}?' : anonName(peerId),
                   textAlign: TextAlign.center, style: Theme.of(context).textTheme.titleLarge),
-              const SizedBox(height: 8),
-              Text(
-                "You won't be able to send or receive messages. This chat stays saved on your phone.",
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyLarge,
-              ),
+              if (paired) ...[
+                const SizedBox(height: 8),
+                Text(
+                  "You won't be able to send or receive messages. This chat stays saved on your phone.",
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodyLarge,
+                ),
+              ],
               const SizedBox(height: 22),
+              if (paired) ...[
+                SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: TextButton(
+                    style: TextButton.styleFrom(
+                      backgroundColor: TB.pinkDark,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                    ),
+                    onPressed: () => Navigator.of(context).pop(_ChatAction.unpair),
+                    child: const Text('Unpair',
+                        style: TextStyle(fontFamily: TB.display, fontWeight: FontWeight.w600, fontSize: 17)),
+                  ),
+                ),
+                const SizedBox(height: 10),
+              ],
               SizedBox(
                 width: double.infinity,
-                height: 56,
+                height: 52,
                 child: TextButton(
                   style: TextButton.styleFrom(
-                    backgroundColor: TB.pinkDark,
-                    foregroundColor: Colors.white,
+                    backgroundColor: TB.pinkSoft,
+                    foregroundColor: TB.pinkDark,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
                   ),
-                  onPressed: () => Navigator.of(context).pop(_ChatAction.unpair),
-                  child: const Text('Unpair',
-                      style: TextStyle(fontFamily: TB.display, fontWeight: FontWeight.w600, fontSize: 17)),
+                  onPressed: () => Navigator.of(context).pop(_ChatAction.block),
+                  child: const Text('Block',
+                      style: TextStyle(fontFamily: TB.display, fontWeight: FontWeight.w600, fontSize: 16)),
                 ),
               ),
               const SizedBox(height: 10),
