@@ -50,10 +50,13 @@ class ChatDb extends ChangeNotifier {
 
   late Database _db;
 
+  /// Kept in memory too, because the radio callbacks must decide at once.
+  final Set<String> _blocked = {};
+
   Future<void> open() async {
     _db = await openDatabase(
       join(await getDatabasesPath(), 'tb_chat.db'),
-      version: 2,
+      version: 3,
       onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
       onCreate: (db, _) async {
         await db.execute('''
@@ -80,15 +83,26 @@ class ChatDb extends ChangeNotifier {
             status TEXT NOT NULL,
             created_at INTEGER NOT NULL
           )''');
+        await db.execute(_createBlockedPeers);
       },
       onUpgrade: (db, from, _) async {
         if (from < 2) {
           await db.execute('ALTER TABLE members ADD COLUMN unpaired_at INTEGER');
           await db.execute('ALTER TABLE members ADD COLUMN unpair_pending INTEGER NOT NULL DEFAULT 0');
         }
+        if (from < 3) await db.execute(_createBlockedPeers);
       },
     );
+    _blocked
+      ..clear()
+      ..addAll(await blockedPeers());
   }
+
+  static const _createBlockedPeers = '''
+    CREATE TABLE blocked_peers (
+      peer_id TEXT PRIMARY KEY,
+      blocked_at INTEGER NOT NULL
+    )''';
 
   /// Every direct chat, newest activity first. Empty until the user pairs with someone.
   Future<List<ChatSummary>> chats(String myId) async {
@@ -163,6 +177,27 @@ class ChatDb extends ChangeNotifier {
 
   Future<void> unpairNoticeSent(String peerId) async {
     await _db.update('members', {'unpair_pending': 0}, where: 'peer_id = ?', whereArgs: [peerId]);
+    notifyListeners();
+  }
+
+  bool isBlocked(String peerId) => _blocked.contains(peerId);
+
+  /// Newest first.
+  Future<List<String>> blockedPeers() async {
+    final rows = await _db.query('blocked_peers', columns: ['peer_id'], orderBy: 'blocked_at DESC, rowid DESC');
+    return rows.map((r) => r['peer_id'] as String).toList();
+  }
+
+  Future<void> block(String peerId) async {
+    await _db.insert('blocked_peers', {'peer_id': peerId, 'blocked_at': DateTime.now().millisecondsSinceEpoch},
+        conflictAlgorithm: ConflictAlgorithm.ignore);
+    _blocked.add(peerId);
+    notifyListeners();
+  }
+
+  Future<void> unblock(String peerId) async {
+    await _db.delete('blocked_peers', where: 'peer_id = ?', whereArgs: [peerId]);
+    _blocked.remove(peerId);
     notifyListeners();
   }
 

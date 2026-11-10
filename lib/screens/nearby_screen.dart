@@ -368,7 +368,8 @@ class _Problem extends StatelessWidget {
         ),
       _ => (
           "Couldn't start scanning",
-          'Something went wrong with Bluetooth or Wi-Fi. Try again.',
+          'Something went wrong with Bluetooth or Wi-Fi. Try again.'
+              '${scanner.failure == null ? '' : '\n\nError: ${scanner.failure}'}',
           'Try again',
           scanner.rescan,
         ),
