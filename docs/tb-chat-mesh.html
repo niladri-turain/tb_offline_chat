@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<title>TB Chat Mesh — Relay Messaging Plan</title>
+<link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=Poppins:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  @page { size: A4; margin: 18mm 16mm 18mm 16mm; }
+  :root { --pink:#ec4899; --purple:#7c3aed; --lav:#ede9fe; --ink:#1f1b2e; --muted:#5b5670; --line:#e7e3f3; --green:#047857; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: "Inter","Hind Siliguri","Bangla Sangam MN",sans-serif; color:var(--ink); font-size:11pt; line-height:1.65; background:#fff; }
+  .hero { background: linear-gradient(135deg,var(--pink),var(--purple)); color:#fff; border-radius:16px; padding:22px 24px; margin-bottom:18px; }
+  .hero h1 { font-family:"Poppins","Hind Siliguri",sans-serif; margin:0 0 4px; font-size:22pt; font-weight:700; }
+  .hero p { margin:0; opacity:.92; }
+  h2 { font-family:"Poppins","Hind Siliguri",sans-serif; font-size:14pt; color:var(--purple); margin:22px 0 8px; padding-bottom:4px; border-bottom:2px solid var(--line); break-after:avoid; }
+  h3 { font-family:"Poppins","Hind Siliguri",sans-serif; font-size:11.5pt; margin:0 0 4px; display:flex; align-items:center; gap:8px; }
+  code { font-family: ui-monospace, Menlo, monospace; font-size:9.5pt; background:var(--lav); color:#5b21b6; padding:1px 5px; border-radius:5px; }
+  pre { font-family: ui-monospace, Menlo, monospace; font-size:9.5pt; background:#f6f4fb; border:1px solid var(--line); border-radius:10px; padding:10px 14px; margin:8px 0; white-space:pre-wrap; break-inside:avoid; }
+  .num { flex:none; width:22px; height:22px; border-radius:50%; background:linear-gradient(135deg,var(--pink),var(--purple)); color:#fff; font-size:9pt; font-weight:600; display:inline-flex; align-items:center; justify-content:center; font-family:"Poppins",sans-serif; }
+  .card { border:1px solid var(--line); border-radius:12px; padding:12px 16px 8px; margin:10px 0; break-inside:avoid; }
+  .ok { background:#ecfdf5; border:1px solid #a7f3d0; border-left:5px solid #10b981; border-radius:10px; padding:12px 16px; margin:14px 0; break-inside:avoid; }
+  .ok h3 { color:var(--green); }
+  .warn { background:#fff7ed; border:1px solid #fed7aa; border-left:5px solid #f97316; border-radius:10px; padding:12px 16px; margin:14px 0; break-inside:avoid; }
+  .warn h3 { color:#c2410c; }
+  /* flow diagram */
+  .flow { display:flex; align-items:center; justify-content:center; gap:6px; margin:14px 0 4px; }
+  .node { width:62px; height:62px; border-radius:50%; display:flex; flex-direction:column; align-items:center; justify-content:center; font-family:"Poppins",sans-serif; font-weight:600; font-size:15pt; color:#fff; }
+  .node small { font-family:"Hind Siliguri","Inter",sans-serif; font-size:7.5pt; font-weight:500; opacity:.95; }
+  .end { background:linear-gradient(135deg,var(--pink),var(--purple)); }
+  .relay { background:#c4b5fd; color:#3b0764; }
+  .arrow { font-size:16pt; color:var(--purple); }
+  .caption { text-align:center; color:var(--muted); font-size:9.5pt; margin:2px 0 12px; }
+  table { width:100%; border-collapse:collapse; margin:8px 0; font-size:10pt; break-inside:avoid; }
+  th, td { border:1px solid var(--line); padding:6px 9px; text-align:left; vertical-align:top; }
+  th { background:#f6f4fb; font-family:"Poppins","Hind Siliguri",sans-serif; font-weight:600; }
+  ul { margin:4px 0 6px; padding-left:20px; }
+  li { margin:2px 0; }
+  .muted { color:var(--muted); }
+  footer { margin-top:20px; font-size:9pt; color:var(--muted); text-align:center; }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <h1>TB Chat Mesh</h1>
+  <p>এক phone থেকে আরেক phone হয়ে message পৌঁছানো: idea আর কী কী লাগবে</p>
+</div>
+
+<h2>Idea টা কী</h2>
+<p>এখন দুজন Nearby-তে একে অপরকে দেখে, pair করে, তারপর chat করে। নতুন idea হলো: A-এর message D-এর কাছে পৌঁছাবে, যদিও D সরাসরি A-এর কাছে নেই। মাঝের phone-গুলো (B, C) message টা হাত বদল করে পৌঁছে দেবে, কিন্তু ভেতরে কী লেখা আছে দেখতে পারবে না। D পেলে A-এর কাছে “D received” আসবে।</p>
+
+<div class="flow">
+  <div class="node end">A<small>পাঠায়</small></div><span class="arrow">➜</span>
+  <div class="node relay">B<small>relay</small></div><span class="arrow">➜</span>
+  <div class="node relay">C<small>relay</small></div><span class="arrow">➜</span>
+  <div class="node end">D<small>পায়</small></div>
+</div>
+<p class="caption">সিল করা খাম: B আর C শুধু “কাকে দিতে হবে” দেখে, ভেতরের লেখা দেখে না</p>
+<div class="flow">
+  <div class="node end">A<small>✓ পেল</small></div><span class="arrow">⬅</span>
+  <div class="node relay">B</div><span class="arrow">⬅</span>
+  <div class="node relay">C</div><span class="arrow">⬅</span>
+  <div class="node end">D<small>receipt</small></div>
+</div>
+<p class="caption">“D received” receipt উল্টো পথে ফেরে, D-এর sign করা, তাই কেউ নকল করতে পারে না</p>
+
+<div class="ok">
+  <h3>✅ এটা কি সম্ভব? হ্যাঁ</h3>
+  <p style="margin:4px 0">এই ধরনের network-কে <b>mesh network</b> বলে। Bridgefy, Briar-এর মতো offline chat app এভাবেই কাজ করে। আমাদের app-এ Google Nearby আর BLE আগে থেকেই আছে, ওর ওপরেই বানানো যাবে।</p>
+</div>
+
+<h2>কী কী লাগবে</h2>
+
+<div class="card">
+  <h3><span class="num">1</span>প্রত্যেক phone-এর নিজস্ব key <span class="muted" style="font-weight:500;font-size:9.5pt">· সবচেয়ে জরুরি</span></h3>
+  <ul>
+    <li>এখন ID হলো ৮ অক্ষরের একটা random লেখা। এর জায়গায় প্রত্যেক phone-এর একটা key জোড়া থাকবে, public আর private (<code>cryptography</code> package)।</li>
+    <li>ID হবে public key থেকে বানানো। এতে block-এর একটা পুরনো সমস্যাও মিটবে: এখন কেউ অন্যের ID নকল করতে পারে, তখন আর পারবে না।</li>
+    <li>A-কে আগে থেকেই D-এর public key জানতে হবে: একবার সামনাসামনি দেখা হলে বা QR code scan করে।</li>
+  </ul>
+</div>
+
+<div class="card">
+  <h3><span class="num">2</span>Message-এর খাম (envelope)</h3>
+<pre>{
+  id:     "a91f…",      // একই message দুবার না নেওয়ার জন্য
+  to:     "D-এর ID",    // relay শুধু এটুকু দেখে
+  ttl:    5,            // প্রতি ধাপে ১ কমে, ০ হলে থামে
+  sealed: "…"           // encrypted লেখা, শুধু D খুলতে পারে
+}</pre>
+</div>
+
+<div class="card">
+  <h3><span class="num">3</span>নিজে থেকে connect (auto-connect)</h3>
+  <ul>
+    <li><b>Relay connection:</b> কাউকে না জিজ্ঞেস করে নিজে connect হবে, শুধু খাম পার করার জন্য। ভেতরের লেখা কেউ দেখে না, তাই accept লাগে না।</li>
+    <li><b>Chat pairing:</b> এখন যেমন আছে, মানুষ নিজে accept করবে।</li>
+  </ul>
+</div>
+
+<div class="card">
+  <h3><span class="num">4</span>পথ খোঁজা (routing)</h3>
+  <ul>
+    <li>শুরুতে সবচেয়ে সহজ উপায় <b>flooding</b>: যার কাছে আসবে, সে তার সব connected phone-এ পাঠিয়ে দেবে।</li>
+    <li><code>id</code> আর <code>ttl</code> থাকায় message চক্রাকারে ঘুরতে থাকবে না।</li>
+    <li>পরে চাইলে আরো বুদ্ধিমান routing যোগ করা যায়।</li>
+  </ul>
+</div>
+
+<div class="card">
+  <h3><span class="num">5</span>ধরে রেখে পরে পাঠানো (store and forward)</h3>
+  <ul>
+    <li>B-এর কাছে পরের জন এখন না থাকলে B message কিছু সময় ধরে রাখবে, পরে কেউ এলে পাঠাবে।</li>
+    <li>এখনকার pending message-এর ব্যবস্থাটাই এখানে কাজে লাগবে।</li>
+  </ul>
+</div>
+
+<div class="card">
+  <h3><span class="num">6</span>“D received” receipt</h3>
+  <ul>
+    <li>D একটা receipt sign করে উল্টো পথে A-কে পাঠাবে। Sign করা, তাই মাঝের কেউ নকল receipt বানাতে পারবে না।</li>
+  </ul>
+</div>
+
+<h2 style="break-before:page">যেসব সীমাবদ্ধতা থাকবে</h2>
+<table>
+  <tr><th style="width:28%">বিষয়</th><th>কী হবে</th></tr>
+  <tr><td>Phone-এর সংখ্যা</td><td>Nearby একসাথে মোটামুটি ৩ থেকে ৮টা phone-এর সাথে connect রাখতে পারে। বেশি মানুষ থাকলে network ছোট ছোট গুচ্ছে ভাগ হয়ে যায়।</td></tr>
+  <tr><td>App চালু রাখা</td><td>B আর C-কে relay করতে হলে app খোলা রাখতে হবে, অথবা background-এ চলতে হবে। Android-এ foreground service লাগবে, iPhone background-এ এটা প্রায় করতেই দেয় না।</td></tr>
+  <tr><td>Android ↔ iPhone</td><td>এর মধ্যে শুধু BLE চলে, যা খুব ধীর। ছোট text পাঠানো যাবে, ছবি কঠিন।</td></tr>
+  <tr><td>গোপনীয়তা</td><td>মাঝের phone লেখা দেখবে না, কিন্তু “কে কাকে পাঠাচ্ছে” দেখতে পাবে। এটাও লুকানো যায়, কিন্তু অনেক বেশি জটিল।</td></tr>
+  <tr><td>Spam</td><td>কেউ হাজার message পাঠিয়ে network ভরিয়ে দিতে পারে। প্রত্যেক phone থেকে কতগুলো যাবে তার সীমা দিতে হবে।</td></tr>
+  <tr><td>Block</td><td>Block করা মানুষের message relay হবে কিনা ঠিক করতে হবে। পরামর্শ: relay হোক, কারণ ভেতরে কী আছে কেউ দেখে না।</td></tr>
+  <tr><td>Battery</td><td>সবসময় scan আর connect চালু থাকলে battery বেশি খরচ হবে।</td></tr>
+</table>
+
+<h2>ধাপে ধাপে plan</h2>
+<table>
+  <tr><th style="width:8%">ধাপ</th><th style="width:34%">কাজ</th><th>এর পরে কী দেখা যাবে</th></tr>
+  <tr><td>১</td><td>Key আর নতুন ID</td><td>প্রত্যেক phone-এর নকল-করা-যায়-না এমন ID। বাকি সব এর ওপর নির্ভর করে।</td></tr>
+  <tr><td>২</td><td>Auto relay connection (Android)</td><td>Flooding, <code>ttl</code>, আগে দেখা message মনে রাখা।</td></tr>
+  <tr><td>৩</td><td>Encrypted খাম আর receipt</td><td>A → B → C → D → “D received” পুরোটা কাজ করবে।</td></tr>
+  <tr><td>৪</td><td>Store and forward, background</td><td>পরের জন না থাকলেও message পরে পৌঁছাবে।</td></tr>
+  <tr><td>৫</td><td>iPhone (BLE)</td><td>iPhone-ও mesh-এ যোগ দেবে, ধীর গতিতে।</td></tr>
+</table>
+<p>প্রথম তিনটা ধাপ হলেই চারটা Android phone বা emulator দিয়ে A → B → C → D আর receipt পুরোটা দেখানো যাবে।</p>
+
+<footer>TB Chat Mesh · Relay Messaging Plan</footer>
+</body>
+</html>
