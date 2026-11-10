@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:nearby_connections/nearby_connections.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -70,6 +71,9 @@ class NearbyScanner extends ChangeNotifier {
 
   ScanStatus status = ScanStatus.idle;
   bool permanentlyDenied = false;
+
+  /// Nearby's own message for the last failed start, shown so the cause can be reported.
+  String? failure;
   final Map<String, NearbyPeer> _found = {};
   int _holders = 0;
   // Start and stop run one after another; overlapping them makes Nearby fail with ALREADY_DISCOVERING.
@@ -401,11 +405,11 @@ class NearbyScanner extends ChangeNotifier {
 
     await _stopRadios();
     _found.clear();
-    try {
-      if (Platform.isAndroid) await _startNearby();
-    } catch (e) {
-      debugPrint('Nearby start failed: $e');
-      return _set(ScanStatus.failed);
+    failure = null;
+    if (Platform.isAndroid && !await _startNearbyWithRetry()) {
+      // Discovery can fail with Location off even where the check above doesn't apply.
+      final locationOn = await Permission.location.serviceStatus.isEnabled;
+      return _set(locationOn ? ScanStatus.failed : ScanStatus.locationOff);
     }
     try {
       await _ble.startRadios();
@@ -415,6 +419,26 @@ class NearbyScanner extends ChangeNotifier {
       if (!Platform.isAndroid) return _set(ScanStatus.failed);
     }
     _set(ScanStatus.scanning);
+  }
+
+  /// Bluetooth that has only just come on can refuse the first attempt, so try twice.
+  Future<bool> _startNearbyWithRetry() async {
+    try {
+      await _startNearby();
+      return true;
+    } catch (e) {
+      debugPrint('Nearby start failed, retrying: $e');
+    }
+    await Future<void>.delayed(const Duration(seconds: 2));
+    await _stopRadios();
+    try {
+      await _startNearby();
+      return true;
+    } catch (e) {
+      debugPrint('Nearby start failed: $e');
+      failure = e is PlatformException ? e.message : '$e';
+      return false;
+    }
   }
 
   Future<void> _startNearby() async {
