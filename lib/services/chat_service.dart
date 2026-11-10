@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 
 import '../data/chat_db.dart';
 import '../data/identity.dart';
+import '../data/prefs.dart';
 import 'nearby_scanner.dart';
 
 /// Sends and receives chat over a Nearby connection. Every message is saved on this phone first,
@@ -94,6 +95,36 @@ class ChatService {
   Future<void> unblock(String peerId) async {
     await _db.unblock(peerId);
     // The radios only report someone once, so look again for anyone who was being ignored.
+    await _scanner.rescan();
+  }
+
+  /// Starts over with a new ID. All chats are deleted; whoever is in range is told they're unpaired.
+  Future<void> newIdentity() async {
+    await _leaveEveryone();
+    await _db.deleteAllChats();
+    await Identity.renew();
+    await _scanner.rescan();
+  }
+
+  /// Deletes everything this app keeps and goes back to first launch.
+  Future<void> eraseEverything() async {
+    await _leaveEveryone();
+    await _scanner.stop();
+    await _db.eraseAll();
+    await Identity.reset();
+    await Prefs.load();
+  }
+
+  /// Phones out of range can't be told; their chat stays until they unpair it themselves.
+  Future<void> _leaveEveryone() async {
+    for (final peerId in await _db.pairedPeerIds()) {
+      if (_scanner.isConnected(peerId)) await sendUnpairNotice(peerId);
+    }
+  }
+
+  /// Turns being findable on or off, and restarts the radios so it takes effect now.
+  Future<void> setVisible(bool visible) async {
+    await Prefs.setVisible(visible);
     await _scanner.rescan();
   }
 

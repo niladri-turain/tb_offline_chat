@@ -11,6 +11,7 @@ import 'package:permission_handler/permission_handler.dart';
 
 import '../data/chat_db.dart';
 import '../data/identity.dart';
+import '../data/prefs.dart';
 import 'ble_link.dart';
 import 'chat_service.dart';
 
@@ -175,7 +176,9 @@ class NearbyScanner extends ChangeNotifier {
   /// dial each other at once.
   Future<void> _redial(String endpointId, String peerId) async {
     if (connected.containsKey(peerId) || _redialing.contains(peerId)) return;
-    if (_connecting.containsValue(peerId) || Identity.myId.compareTo(peerId) > 0) return;
+    if (_connecting.containsValue(peerId)) return;
+    // A hidden phone can't be found, so it always dials; otherwise only the lower ID does.
+    if (Prefs.visible && Identity.myId.compareTo(peerId) > 0) return;
     final known = await ChatDb.instance.isPaired(peerId) || await ChatDb.instance.needsUnpairNotice(peerId);
     if (!known) return;
     _redialing.add(peerId);
@@ -442,14 +445,17 @@ class NearbyScanner extends ChangeNotifier {
   }
 
   Future<void> _startNearby() async {
-    await Nearby().startAdvertising(
-      Identity.myId,
-      Strategy.P2P_CLUSTER,
-      serviceId: serviceId,
-      onConnectionInitiated: _onInitiated,
-      onConnectionResult: _onResult,
-      onDisconnected: _onDisconnected,
-    );
+    // Hidden: still look for others, but don't announce this phone.
+    if (Prefs.visible) {
+      await Nearby().startAdvertising(
+        Identity.myId,
+        Strategy.P2P_CLUSTER,
+        serviceId: serviceId,
+        onConnectionInitiated: _onInitiated,
+        onConnectionResult: _onResult,
+        onDisconnected: _onDisconnected,
+      );
+    }
     await Nearby().startDiscovery(
       Identity.myId,
       Strategy.P2P_CLUSTER,

@@ -43,6 +43,7 @@ dependencies:
   flutter_blue_plus: ^2.3.14
   device_info_plus: ^13.3.0
   cryptography: ^2.9.0
+  package_info_plus: ^10.2.2
 
 dev_dependencies:
   flutter_test:

@@ -10,6 +10,7 @@ final class BlePeripheral: NSObject, FlutterPlugin, CBPeripheralManagerDelegate 
   private var rxUuid: CBUUID?
   private var serviceUuid: CBUUID?
   private var serviceAdded = false
+  private var shouldAdvertise = true
   private var startResult: FlutterResult?
   private var centrals: [String: CBCentral] = [:]
   private var outbox: [(central: CBCentral, value: Data, result: FlutterResult)] = []
@@ -53,8 +54,16 @@ final class BlePeripheral: NSObject, FlutterPlugin, CBPeripheralManagerDelegate 
     else {
       return result(FlutterError(code: "bad_args", message: nil, details: nil))
     }
-    if serviceUuid == nil {
-      serviceUuid = CBUUID(string: service)
+    shouldAdvertise = args?["advertise"] as? Bool ?? true
+    let uuid = CBUUID(string: service)
+    if serviceUuid != uuid {
+      // A new ID means a new service UUID, so the old service has to go.
+      if serviceUuid != nil {
+        manager?.removeAllServices()
+        serviceAdded = false
+        centrals.removeAll()
+      }
+      serviceUuid = uuid
       rxUuid = CBUUID(string: rx)
       txCharacteristic = CBMutableCharacteristic(
         type: CBUUID(string: tx), properties: [.notify], value: nil, permissions: [.readable])
@@ -90,6 +99,8 @@ final class BlePeripheral: NSObject, FlutterPlugin, CBPeripheralManagerDelegate 
 
   private func advertise() {
     guard let manager = manager, let serviceUuid = serviceUuid else { return }
+    // Hidden: keep the service for links this phone opens, but don't announce it.
+    if !shouldAdvertise { return finishStart(error: nil) }
     if manager.isAdvertising { return finishStart(error: nil) }
     manager.startAdvertising([CBAdvertisementDataServiceUUIDsKey: [serviceUuid]])
   }
