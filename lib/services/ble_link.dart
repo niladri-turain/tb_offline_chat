@@ -10,6 +10,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 
 import '../data/identity.dart';
+import '../data/prefs.dart';
 
 /// FlutterBluePlus asks every app to declare this. Commercial use needs a paid license.
 const _fbpLicense = License.nonprofit;
@@ -197,6 +198,7 @@ class BleLink {
       'service': BleWire.serviceUuid(Identity.myId, ios: Platform.isIOS),
       'rx': BleWire.rxUuid,
       'tx': BleWire.txUuid,
+      'advertise': Prefs.visible,
     });
     _scan = FlutterBluePlus.onScanResults.listen(_onScanResults);
     _sweep = Timer.periodic(const Duration(seconds: 5), (_) => _forgetGone());

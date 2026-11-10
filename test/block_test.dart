@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -23,6 +24,8 @@ void main() {
     TestWidgetsFlutterBinding.ensureInitialized();
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
+    // Each test file gets its own folder, so files running in parallel don't share a database.
+    databaseFactory.setDatabasesPath(Directory.systemTemp.createTempSync('tb_chat_block_').path);
     Identity.myId = me;
   });
 

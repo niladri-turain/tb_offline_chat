@@ -24,7 +24,19 @@ class Identity {
       myId = saved;
       return;
     }
+    await renew();
+  }
+
+  /// Replaces the ID with a new random one.
+  static Future<void> renew() async {
     myId = const Uuid().v4().replaceAll('-', '').substring(0, 8).toUpperCase();
     await _storage.write(key: _key, value: myId);
+  }
+
+  /// Forgets everything kept in secure storage, settings included, and starts over with a new ID.
+  static Future<void> reset() async {
+    await _storage.deleteAll();
+    onboarded = false;
+    await renew();
   }
 }

@@ -43,6 +43,7 @@ class BlePeripheral(context: Context, messenger: BinaryMessenger) : MethodChanne
     private var tx: BluetoothGattCharacteristic? = null
     private var startResult: MethodChannel.Result? = null
     private var advertising = false
+    private var shouldAdvertise = true
 
     private val subscribed = HashMap<String, BluetoothDevice>()
     private val maxLengths = HashMap<String, Int>()
@@ -82,10 +83,13 @@ class BlePeripheral(context: Context, messenger: BinaryMessenger) : MethodChanne
         if (manager.adapter?.bluetoothLeAdvertiser == null) {
             return result.error("start_failed", "This phone can't advertise over BLE", null)
         }
+        shouldAdvertise = call.argument<Boolean>("advertise") ?: true
+        val service = UUID.fromString(call.argument<String>("service"))
+        // A new ID means a new service UUID, so the old server can't be reused.
+        if (server != null && service != serviceUuid) closeServer()
         startResult = result
         if (server != null) return advertise()
 
-        val service = UUID.fromString(call.argument<String>("service"))
         val rxId = UUID.fromString(call.argument<String>("rx"))
         val txId = UUID.fromString(call.argument<String>("tx"))
         serviceUuid = service
@@ -117,7 +121,16 @@ class BlePeripheral(context: Context, messenger: BinaryMessenger) : MethodChanne
         opened.addService(gattService)
     }
 
+    private fun closeServer() {
+        server?.close()
+        server = null
+        subscribed.clear()
+        maxLengths.clear()
+    }
+
     private fun advertise() {
+        // Hidden: keep the server for links this phone opens, but don't announce it.
+        if (!shouldAdvertise) return finishStart(null)
         if (advertising) return finishStart(null)
         val advertiser = manager.adapter?.bluetoothLeAdvertiser ?: return finishStart("BLE advertiser is gone")
         val settings = AdvertiseSettings.Builder()

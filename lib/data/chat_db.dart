@@ -212,6 +212,26 @@ class ChatDb extends ChangeNotifier {
     return rows.map(_message).toList();
   }
 
+  /// Deletes every message but keeps the chats and pairings.
+  Future<void> clearAllMessages() async {
+    await _db.delete('messages');
+    notifyListeners();
+  }
+
+  /// Deletes every chat with its pairing and messages. The block list stays.
+  Future<void> deleteAllChats() async {
+    await _db.delete('conversations');
+    notifyListeners();
+  }
+
+  /// Deletes chats, pairings, messages and the block list.
+  Future<void> eraseAll() async {
+    await _db.delete('conversations');
+    await _db.delete('blocked_peers');
+    _blocked.clear();
+    notifyListeners();
+  }
+
   /// Mine that the other phone hasn't confirmed yet, oldest first.
   Future<List<ChatMessage>> undelivered(String conversationId, String myId) async {
     final rows = await _db.query('messages',
