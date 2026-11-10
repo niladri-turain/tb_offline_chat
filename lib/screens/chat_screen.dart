@@ -22,7 +22,7 @@ Future<void> showUnpairedDialog(BuildContext context, String peerId) => showDial
       ),
     );
 
-enum _ChatAction { unpair, block, clear }
+enum _ChatAction { unpair, block, unblock, clear }
 
 /// One-to-one chat. Stays readable after unpairing, but nothing can be sent.
 class ChatScreen extends StatefulWidget {
@@ -77,7 +77,7 @@ class _ChatScreenState extends State<ChatScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _OptionsSheet(peerId: widget.peerId, paired: _paired),
+      builder: (_) => _OptionsSheet(peerId: widget.peerId, paired: _paired, blocked: _blocked),
     );
     switch (action) {
       case _ChatAction.unpair:
@@ -85,6 +85,8 @@ class _ChatScreenState extends State<ChatScreen> {
         if (mounted) await showUnpairedDialog(context, widget.peerId);
       case _ChatAction.block:
         await _confirmBlock();
+      case _ChatAction.unblock:
+        await _confirmUnblock();
       case _ChatAction.clear:
         await _confirmClear();
       case null:
@@ -101,7 +103,7 @@ class _ChatScreenState extends State<ChatScreen> {
         title: Text('Block ${anonName(widget.peerId)}?', style: Theme.of(context).textTheme.titleMedium),
         content: Text(
           "You won't see them in Nearby and they can't connect to you. They won't be told you blocked "
-          'them. This chat stays saved on your phone. You can unblock them in Settings.',
+          'them. This chat stays saved on your phone. You can unblock them here or in Settings.',
           style: Theme.of(context).textTheme.bodyLarge,
         ),
         actions: [
@@ -115,6 +117,30 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
     );
     if (confirmed == true) await ChatService.instance.block(widget.peerId);
+  }
+
+  Future<void> _confirmUnblock() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+        title: Text('Unblock ${anonName(widget.peerId)}?', style: Theme.of(context).textTheme.titleMedium),
+        content: Text(
+          "They'll show in Nearby again and can send you a pair request. To chat, you need to pair again.",
+          style: Theme.of(context).textTheme.bodyLarge,
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: TB.indigo),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Unblock'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) await ChatService.instance.unblock(widget.peerId);
   }
 
   Future<void> _confirmClear() async {
@@ -154,7 +180,7 @@ class _ChatScreenState extends State<ChatScreen> {
             paired: _paired,
             blocked: _blocked,
             connected: _scanner.isConnected(widget.peerId),
-            onMore: _blocked ? _confirmClear : _openOptions,
+            onMore: _openOptions,
           ),
           Expanded(
             child: ListView.builder(
@@ -173,7 +199,7 @@ class _ChatScreenState extends State<ChatScreen> {
           if (_paired)
             _InputBar(onSend: (text) => ChatService.instance.send(widget.peerId, text))
           else if (_blocked)
-            const _UnpairedBar(label: "Blocked · you can't send messages")
+            _UnpairedBar(label: 'Blocked · tap to unblock', onTap: _confirmUnblock)
           else
             _UnpairedBar(
               label: "Unpaired · you can't send messages",
@@ -447,12 +473,13 @@ class _UnpairedBar extends StatelessWidget {
   }
 }
 
-/// Unpair or clear this chat. Pops the chosen action, or null for Cancel.
+/// Unpair, block or unblock, or clear this chat. Pops the chosen action, or null for Cancel.
 class _OptionsSheet extends StatelessWidget {
-  const _OptionsSheet({required this.peerId, required this.paired});
+  const _OptionsSheet({required this.peerId, required this.paired, required this.blocked});
 
   final String peerId;
   final bool paired;
+  final bool blocked;
 
   @override
   Widget build(BuildContext context) {
@@ -514,8 +541,8 @@ class _OptionsSheet extends StatelessWidget {
                     foregroundColor: TB.pinkDark,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
                   ),
-                  onPressed: () => Navigator.of(context).pop(_ChatAction.block),
-                  child: const Text('Block',
+                  onPressed: () => Navigator.of(context).pop(blocked ? _ChatAction.unblock : _ChatAction.block),
+                  child: Text(blocked ? 'Unblock' : 'Block',
                       style: TextStyle(fontFamily: TB.display, fontWeight: FontWeight.w600, fontSize: 16)),
                 ),
               ),
