@@ -76,17 +76,23 @@ class GradientButton extends StatelessWidget {
       ),
       child: Material(
         color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(18),
-          onTap: onPressed,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              if (icon != null) ...[Icon(icon, color: Colors.white, size: 22), const SizedBox(width: 10)],
-              Text(label,
-                  style: const TextStyle(
-                      fontFamily: TB.display, fontWeight: FontWeight.w600, fontSize: 17, color: Colors.white)),
-            ],
+        // Its own button node, so it isn't merged into a tappable parent such as a dialog.
+        child: Semantics(
+          container: true,
+          button: true,
+          enabled: onPressed != null,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(18),
+            onTap: onPressed,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (icon != null) ...[Icon(icon, color: Colors.white, size: 22), const SizedBox(width: 10)],
+                Text(label,
+                    style: const TextStyle(
+                        fontFamily: TB.display, fontWeight: FontWeight.w600, fontSize: 17, color: Colors.white)),
+              ],
+            ),
           ),
         ),
       ),

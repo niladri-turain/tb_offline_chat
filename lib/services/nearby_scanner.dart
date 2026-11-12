@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:cryptography/dart.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -14,6 +15,22 @@ import '../data/identity.dart';
 import '../data/prefs.dart';
 import 'ble_link.dart';
 import 'chat_service.dart';
+
+/// Letters and digits that can't be mistaken for each other (no 0/O, 1/I).
+const _codeAlphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+
+/// Turns Nearby's authentication token into a 5-character code people can read aloud.
+/// The token is the same on both phones, so the code is too; a different token gives a different code.
+String pairCode(String token) {
+  final bytes = const DartSha256().hashSync(utf8.encode(token)).bytes;
+  var bits = (bytes[0] << 24) | (bytes[1] << 16) | (bytes[2] << 8) | bytes[3];
+  final out = StringBuffer();
+  for (var i = 0; i < 5; i++) {
+    out.write(_codeAlphabet[bits & 31]);
+    bits >>= 5;
+  }
+  return out.toString();
+}
 
 enum ScanStatus { idle, starting, scanning, permissionDenied, bluetoothOff, locationOff, failed }
 
@@ -235,7 +252,8 @@ class NearbyScanner extends ChangeNotifier {
     }
     _connecting[endpointId] = peerId;
     _endpointPeers[endpointId] = peerId;
-    final code = info.authenticationToken.toUpperCase();
+    // BLE already makes a clean hex code; Nearby's raw token can hold "_" or "-".
+    final code = BleLink.owns(endpointId) ? info.authenticationToken.toUpperCase() : pairCode(info.authenticationToken);
     if (await ChatDb.instance.isPaired(peerId)) {
       // Already paired earlier: reconnect without asking again.
       _accept(endpointId);
