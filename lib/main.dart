@@ -1,30 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import 'app_start.dart';
 import 'core/di/locator.dart';
-import 'data/auth.dart';
-import 'data/chat_db.dart';
-import 'data/identity.dart';
-import 'data/prefs.dart';
 import 'providers/auth_provider.dart';
+import 'screens/splash_screen.dart';
 import 'theme.dart';
 import 'widgets/app_toast.dart';
 
-Future<void> main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
   setupLocator();
-  await Auth.load();
-  await Identity.load();
-  await Prefs.load();
-  await ChatDb.instance.open();
-  runApp(TbChatApp(start: await appStart()));
+  // The splash screen loads the session, ID, settings and chats, then picks the first screen.
+  runApp(const TbChatApp());
 }
 
 class TbChatApp extends StatelessWidget {
-  const TbChatApp({super.key, required this.start});
-
-  final Widget start;
+  const TbChatApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -35,7 +26,7 @@ class TbChatApp extends StatelessWidget {
         title: 'TB Chat',
         debugShowCheckedModeBanner: false,
         theme: TB.theme(),
-        home: start,
+        home: const SplashScreen(),
       ),
     );
   }
