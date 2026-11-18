@@ -1,25 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import 'app_start.dart';
+import 'core/di/locator.dart';
+import 'data/auth.dart';
 import 'data/chat_db.dart';
 import 'data/identity.dart';
 import 'data/prefs.dart';
-import 'screens/home_shell.dart';
-import 'screens/permission_denied_screen.dart';
-import 'screens/welcome_screen.dart';
-import 'services/nearby_scanner.dart';
+import 'providers/auth_provider.dart';
 import 'theme.dart';
+import 'widgets/app_toast.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  setupLocator();
+  await Auth.load();
   await Identity.load();
   await Prefs.load();
   await ChatDb.instance.open();
-  final Widget start = !Identity.onboarded
-      ? const WelcomeScreen()
-      : await NearbyScanner.instance.hasPermissions()
-          ? const HomeShell()
-          : const PermissionDeniedScreen();
-  runApp(TbChatApp(start: start));
+  runApp(TbChatApp(start: await appStart()));
 }
 
 class TbChatApp extends StatelessWidget {
@@ -29,11 +28,15 @@ class TbChatApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'TB Chat',
-      debugShowCheckedModeBanner: false,
-      theme: TB.theme(),
-      home: start,
+    return ChangeNotifierProvider<AuthProvider>.value(
+      value: locator<AuthProvider>(),
+      child: MaterialApp(
+        navigatorKey: navigatorKey,
+        title: 'TB Chat',
+        debugShowCheckedModeBanner: false,
+        theme: TB.theme(),
+        home: start,
+      ),
     );
   }
 }

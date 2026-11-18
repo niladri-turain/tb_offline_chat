@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:provider/provider.dart';
 
 import '../data/chat_db.dart';
 import '../data/identity.dart';
 import '../data/prefs.dart';
+import '../providers/auth_provider.dart';
 import '../services/chat_service.dart';
 import '../theme.dart';
-import 'welcome_screen.dart';
+import 'login_screen.dart';
 
 /// Settings tab: who you are, whether you can be found, who is blocked, and your data.
 class SettingsScreen extends StatefulWidget {
@@ -122,15 +124,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final ok = await _confirm(
       title: 'Erase everything?',
       body:
-          'Your ID, all chats, pairings, the block list and settings will be deleted from this phone. '
-          "This can't be undone. The app will start again like new.",
+          'Your ID, all chats, pairings, the block list and settings will be deleted from this phone, '
+          "and you'll be logged out. This can't be undone. The app will start again like new.",
       action: 'Erase',
     );
     if (!ok) return;
     await _run(() async {
       final navigator = Navigator.of(context);
+      final auth = context.read<AuthProvider>();
       await ChatService.instance.eraseEverything();
-      navigator.pushAndRemoveUntil(MaterialPageRoute<void>(builder: (_) => const WelcomeScreen()), (_) => false);
+      // Erasing wiped secure storage, so the token is already gone from the phone.
+      auth.sessionErased();
+      navigator.pushAndRemoveUntil(MaterialPageRoute<void>(builder: (_) => const LoginScreen()), (_) => false);
+    });
+  }
+
+  Future<void> _logOut() async {
+    final ok = await _confirm(
+      title: 'Log out?',
+      body: 'Your chats, pairings and ID stay saved on this phone. Log in with your number to use them again.',
+      action: 'Log out',
+    );
+    if (!ok) return;
+    await _run(() async {
+      final navigator = Navigator.of(context);
+      await context.read<AuthProvider>().logOut();
+      navigator.pushAndRemoveUntil(MaterialPageRoute<void>(builder: (_) => const LoginScreen()), (_) => false);
     });
   }
 
@@ -205,6 +224,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   subtitle: 'ID, chats, pairings and settings',
                   danger: true,
                   onTap: _eraseEverything,
+                ),
+              ],
+            ),
+            const _Section('ACCOUNT'),
+            _Card(
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.smartphone_rounded, color: TB.indigo),
+                  title: const Text('Mobile number', style: _titleStyle),
+                  subtitle: Text(context.watch<AuthProvider>().mobile ?? '', style: _subtitleStyle),
+                ),
+                const Divider(height: 1, color: TB.divider),
+                _ActionTile(
+                  icon: Icons.logout_rounded,
+                  title: 'Log out',
+                  subtitle: 'Your chats stay on this phone',
+                  danger: true,
+                  onTap: _logOut,
                 ),
               ],
             ),
