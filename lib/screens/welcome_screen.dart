@@ -32,7 +32,7 @@ class WelcomeScreen extends StatelessWidget {
                             letterSpacing: -0.5,
                             color: TB.ink)),
                     const SizedBox(height: 8),
-                    const Text('Anonymous chat with people nearby.\nNo internet. No account.',
+                    const Text('Anonymous chat with people nearby.\nNo internet needed to chat.',
                         textAlign: TextAlign.center, style: TextStyle(fontSize: 17, color: TB.muted)),
                     const SizedBox(height: 40),
                     const FeatureTile(
@@ -48,7 +48,7 @@ class WelcomeScreen extends StatelessWidget {
                       icon: Icons.visibility_off_outlined,
                       iconColor: TB.purple,
                       title: 'Fully anonymous',
-                      subtitle: 'No name, no number, just a random ID',
+                      subtitle: 'Others see only a random ID, never your number',
                     ),
                     const SizedBox(height: 14),
                     const FeatureTile(

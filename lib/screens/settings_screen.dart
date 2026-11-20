@@ -256,10 +256,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const Divider(height: 1, color: TB.divider),
                 const ListTile(
                   leading: Icon(Icons.lock_outline, color: TB.indigo),
-                  title: Text('No server, no account', style: _titleStyle),
+                  title: Text('Chats never go online', style: _titleStyle),
                   subtitle: Text(
                     'Messages go straight from phone to phone over Bluetooth and Wi-Fi. '
-                    'Your ID and chats are kept only on this phone.',
+                    'Your ID and chats are kept only on this phone. Our server only has your '
+                    'mobile number, for login.',
                     style: _subtitleStyle,
                   ),
                 ),

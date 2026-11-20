@@ -89,7 +89,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         Icon(Icons.lock_outline, size: 16, color: TB.muted),
                         SizedBox(width: 6),
                         Expanded(
-                          child: Text('Your number stays on this phone. Nearby people only see your anonymous ID.',
+                          child: Text('Your number is used only to log you in. Nearby people only see your anonymous ID.',
                               style: TextStyle(fontSize: 12, height: 1.4, color: TB.muted)),
                         ),
                       ],
