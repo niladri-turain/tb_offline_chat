@@ -177,11 +177,13 @@ class _PhoneHero extends StatelessWidget {
       width: 96,
       height: 96,
       decoration: BoxDecoration(
-        gradient: TB.brandGradient,
         borderRadius: BorderRadius.circular(30),
         boxShadow: const [BoxShadow(color: Color(0x38E0067F), blurRadius: 24, offset: Offset(0, 10))],
       ),
-      child: const Icon(Icons.smartphone_rounded, size: 46, color: Colors.white),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(30),
+        child: Image.asset('assets/icon/icon.png', fit: BoxFit.cover),
+      ),
     );
   }
 }
