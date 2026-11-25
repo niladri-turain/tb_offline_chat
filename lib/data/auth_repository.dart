@@ -23,6 +23,12 @@ class AuthRepository {
     return session;
   }
 
+  /// `DELETE /api/v1/auth/delete-account` with only the token header. Returns the server's message.
+  Future<String> deleteAccount() async {
+    final json = await _api.delete(ApiEndpoints.deleteAccount);
+    return json['message'] as String? ?? 'Your account has been deleted successfully.';
+  }
+
   /// There is no logout endpoint: the token is expired by deleting it from this phone.
   Future<void> logOut() => Auth.logOut();
 }

@@ -9,6 +9,7 @@ import '../data/prefs.dart';
 import '../providers/auth_provider.dart';
 import '../services/chat_service.dart';
 import '../theme.dart';
+import '../widgets/app_toast.dart';
 import 'login_screen.dart';
 
 /// Settings tab: who you are, whether you can be found, who is blocked, and your data.
@@ -60,7 +61,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  Future<bool> _confirm({required String title, required String body, required String action}) async =>
+  Future<bool> _confirm({
+    required String title,
+    required String body,
+    required String action,
+    String cancel = 'Cancel',
+  }) async =>
       await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
@@ -69,7 +75,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           title: Text(title, style: Theme.of(context).textTheme.titleMedium),
           content: Text(body, style: Theme.of(context).textTheme.bodyLarge),
           actions: [
-            TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
+            TextButton(onPressed: () => Navigator.of(context).pop(false), child: Text(cancel)),
             TextButton(
               style: TextButton.styleFrom(foregroundColor: TB.pinkDark),
               onPressed: () => Navigator.of(context).pop(true),
@@ -120,22 +126,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
     });
   }
 
-  Future<void> _eraseEverything() async {
+  /// Deletes the account on the server, then wipes this phone and goes back to login.
+  /// If the server call fails nothing is wiped, so the user can try again.
+  Future<void> _deleteAccount() async {
     final ok = await _confirm(
-      title: 'Erase everything?',
+      title: 'Are you sure you want to delete your account?',
       body:
-          'Your ID, all chats, pairings, the block list and settings will be deleted from this phone, '
-          "and you'll be logged out. This can't be undone. The app will start again like new.",
-      action: 'Erase',
+          'Your TB Chat account will be permanently deleted. Your ID, chats, pairings, block list and '
+          'settings will also be removed from this phone. This action cannot be undone.',
+      action: 'Yes',
+      cancel: 'No',
     );
     if (!ok) return;
     await _run(() async {
       final navigator = Navigator.of(context);
       final auth = context.read<AuthProvider>();
+      final message = await auth.deleteAccount();
+      if (message == null) return;
       await ChatService.instance.eraseEverything();
       // Erasing wiped secure storage, so the token is already gone from the phone.
       auth.sessionErased();
       navigator.pushAndRemoveUntil(MaterialPageRoute<void>(builder: (_) => const LoginScreen()), (_) => false);
+      AppToast.success(message);
     });
   }
 
@@ -220,10 +232,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const Divider(height: 1, color: TB.divider),
                 _ActionTile(
                   icon: Icons.delete_forever_outlined,
-                  title: 'Erase everything',
-                  subtitle: 'ID, chats, pairings and settings',
+                  title: 'Delete account',
+                  subtitle: 'Permanently delete your account and all data',
                   danger: true,
-                  onTap: _eraseEverything,
+                  onTap: _deleteAccount,
                 ),
               ],
             ),

@@ -8,7 +8,7 @@ import 'package:http/http.dart' as http;
 import 'api_endpoints.dart';
 import 'api_exception.dart';
 
-/// Sends GET and POST requests to [ApiEndpoints.baseUrl] and returns the decoded JSON.
+/// Sends GET, POST and DELETE requests to [ApiEndpoints.baseUrl] and returns the decoded JSON.
 /// Any failure is thrown as an [ApiException]. In debug builds every call is printed.
 class ApiService {
   ApiService({http.Client? client, this.tokenProvider}) : _client = client ?? http.Client();
@@ -29,6 +29,12 @@ class ApiService {
     final uri = _uri(endpoint, null);
     final encoded = jsonEncode(body ?? const {});
     return _send('POST', uri, encoded, () => _client.post(uri, headers: _headers(), body: encoded));
+  }
+
+  /// Sends no body; only the headers, token included.
+  Future<Map<String, dynamic>> delete(String endpoint) {
+    final uri = _uri(endpoint, null);
+    return _send('DELETE', uri, null, () => _client.delete(uri, headers: _headers()));
   }
 
   Uri _uri(String endpoint, Map<String, String>? query) =>
@@ -77,6 +83,8 @@ class ApiService {
     if (ok) {
       _log('✅ SUCCESS ${response.statusCode} $method $uri\n📥 Response: ${response.body}');
       if (decoded is Map<String, dynamic>) return decoded;
+      // 204 No Content and other empty successes.
+      if (response.body.isEmpty) return const {};
       throw ApiException(
         statusCode: response.statusCode,
         code: 'BAD_RESPONSE',

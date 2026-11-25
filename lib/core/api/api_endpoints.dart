@@ -10,4 +10,5 @@ class ApiEndpoints {
   // Mobile app auth
   static const sendOtp = 'api/v1/auth/send-otp';
   static const verifyOtp = 'api/v1/auth/verify-otp';
+  static const deleteAccount = 'api/v1/auth/delete-account';
 }

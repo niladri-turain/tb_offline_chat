@@ -64,7 +64,18 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// After Erase everything, which already wiped secure storage.
+  /// Deletes the account on the server. Returns the server's message, or null when it failed
+  /// (the error was already shown). The success toast is left to the caller, to show after local data is wiped.
+  Future<String?> deleteAccount() async {
+    try {
+      return await _repository.deleteAccount();
+    } on ApiException catch (e) {
+      AppToast.error(e.message);
+      return null;
+    }
+  }
+
+  /// After the account is deleted and the phone wiped, which already cleared secure storage.
   void sessionErased() {
     Auth.clearMemory();
     notifyListeners();
